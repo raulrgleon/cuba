@@ -1,0 +1,40 @@
+import hashlib
+import json
+from pathlib import Path
+import unittest
+
+DATA = Path(__file__).resolve().parents[1] / "public" / "data"
+
+
+class PublicSnapshots(unittest.TestCase):
+    def test_manifest_and_geojson(self):
+        sources = json.loads((DATA / "sources.json").read_text())
+        for name, digest in sources["sha256"].items():
+            self.assertEqual(hashlib.sha256((DATA / name).read_bytes()).hexdigest(), digest)
+        for level, count in (("ADM1", 16), ("ADM2", 168)):
+            geo = json.loads((DATA / (level.lower() + ".geojson")).read_text())
+            self.assertEqual(geo["type"], "FeatureCollection")
+            self.assertEqual(len({item["id"] for item in geo["features"]}), count)
+            self.assertEqual(len(geo["features"]), count)
+            self.assertTrue(all(item["properties"]["level"] == level for item in geo["features"]))
+            for item in geo["features"]:
+                shape = item["geometry"]
+                polygons = [shape["coordinates"]] if shape["type"] == "Polygon" else shape["coordinates"]
+                self.assertTrue(polygons)
+                for polygon in polygons:
+                    for ring in polygon:
+                        self.assertEqual(ring[0], ring[-1])
+                        self.assertGreaterEqual(len(ring), 4)
+                        self.assertTrue(all(-86 < x < -73 and 18 < y < 25 for x, y in ring))
+
+    def test_series_metadata_and_years(self):
+        indicators = json.loads((DATA / "indicators.json").read_text())
+        self.assertEqual(len(indicators), 3)
+        for series in indicators:
+            self.assertEqual(series["geography"], "CUB")
+            self.assertEqual(series["status"], "estimate")
+            self.assertTrue(series["url"].startswith("https://data.worldbank.org/"))
+            self.assertTrue(series["license"])
+            years = [row["year"] for row in series["observations"]]
+            self.assertEqual(years, sorted(set(years)))
+            self.assertGreater(len(years), 20)

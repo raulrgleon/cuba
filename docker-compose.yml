@@ -1,0 +1,13 @@
+services:
+  cubaos:
+    build: .
+    ports:
+      - "${CUBAOS_BIND:-127.0.0.1}:${CUBAOS_PORT:-8873}:8873"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8873/', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

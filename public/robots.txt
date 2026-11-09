@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://cuba.dnet.llc/sitemap.xml

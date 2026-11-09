@@ -1,0 +1,23 @@
+name: CubaOS checks
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - run: docker compose config --quiet
+      - run: docker compose up --build --wait
+      - run: curl --fail --silent http://127.0.0.1:8873/data/sources.json > /dev/null
+      - if: always()
+        run: docker compose down

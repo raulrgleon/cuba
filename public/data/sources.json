@@ -1,0 +1,30 @@
+{
+  "retrieved": "2026-11-09",
+  "boundaries": [
+    {
+      "id": "ADM1",
+      "provider": "geoBoundaries / OpenStreetMap / Wambacher",
+      "year": "2017",
+      "license": "ODbL 1.0",
+      "licenseUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
+      "url": "https://www.geoboundaries.org/api/current/gbOpen/CUB/ADM1/",
+      "download": "https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/CUB/ADM1/geoBoundaries-CUB-ADM1_simplified.geojson",
+      "source": "OpenStreetMap, Wambacher"
+    },
+    {
+      "id": "ADM2",
+      "provider": "geoBoundaries / OpenStreetMap / Wambacher",
+      "year": "2017",
+      "license": "ODbL 1.0",
+      "licenseUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
+      "url": "https://www.geoboundaries.org/api/current/gbOpen/CUB/ADM2/",
+      "download": "https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/CUB/ADM2/geoBoundaries-CUB-ADM2_simplified.geojson",
+      "source": "OpenStreetMap, Wambacher"
+    }
+  ],
+  "sha256": {
+    "adm1.geojson": "46334b527dadebeee8a6ff6f82a41cdb859ffbcb02985f02060ffb5ad33bd9bd",
+    "adm2.geojson": "901d84820388a179c10d520f58efce3b4dbb86bd36ff33e238d72d3bf7676a8e",
+    "indicators.json": "3a65b5a3def70c2b3bcf88d868c6c3f4385f04f9f9f6265cf6ada502168c67b8"
+  }
+}
