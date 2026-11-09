@@ -235,7 +235,7 @@ export default function Explorer() {
   function openPower(open=true) {
     setEnergyOpen(open);setRightsOpen(false);setDirectory(null);setShowInsights(open);
     if(open){
-      setToolsOpen(false);setAirport(null);setPlace(null);setEnergyDate('');
+      setAirport(null);setPlace(null);setEnergyDate('');
       setLevels(current=>({...current,ADM1:true}));
     }
   }
