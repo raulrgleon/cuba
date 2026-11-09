@@ -12,6 +12,7 @@ type Props = {
   electricityColors:Record<string,string>|null; electricityDate:string;
   population:ProvincialPopulation|null; populationYear:number; populationVisible:boolean;
   place:Place|null; places:PlaceCollection|null; placeLayers:PlaceKind[]; onPlace:(place:Place)=>void;
+  militaryCounts:Record<string,number>|null; onMilitary:(province:string)=>void;
   airports?:Airport[]; airport:Airport|null; onAirport:(airport:Airport)=>void;
 };
 
@@ -50,7 +51,7 @@ export default function MapView(props:Props) {
   const [measurePoints,setMeasurePoints]=useState<[number,number][]>([]);
   const measureMode=useRef(false);
   const [coords,setCoords]=useState('22.00° N · 79.50° W');
-  const {provinces,municipalities,levels,selected,reset,language,light,areas,airports,airport,population,populationYear,populationVisible,place,places,placeLayers,electricityColors,electricityDate}=props;
+  const {provinces,municipalities,levels,selected,reset,language,light,areas,airports,airport,population,populationYear,populationVisible,place,places,placeLayers,electricityColors,electricityDate,militaryCounts}=props;
 
   useEffect(()=>{
     let disposed=false;
@@ -219,6 +220,7 @@ export default function MapView(props:Props) {
     import('maplibre-gl').then(({Marker})=>{
       if(disposed) return;
       for(const item of airports) {
+        if(!item.coordinates)continue;
         const element=document.createElement('button');
         element.type='button';
         element.className='airport-marker';
@@ -233,7 +235,29 @@ export default function MapView(props:Props) {
   },[ready,airports]);
 
   useEffect(()=>{
-    if(!ready||!airport||!map.current) return;
+    const instance=map.current;
+    if(!ready||!instance||!militaryCounts)return;
+    let disposed=false;
+    const markers:{remove:()=>unknown}[]=[];
+    import('maplibre-gl').then(({Marker})=>{
+      if(disposed)return;
+      for(const province of provinces.features){
+        const name=displayName(province);
+        const count=militaryCounts[name];
+        if(!count)continue;
+        const [[west,south],[east,north]]=extent(province);
+        const element=document.createElement('button');
+        element.type='button';element.className='military-marker';element.textContent='◇ '+count;
+        element.setAttribute('aria-label',(language==='es'?'Referencias militares en ':'Military references in ')+name);
+        element.onclick=event=>{event.stopPropagation();latest.current.onMilitary(name);};
+        markers.push(new Marker({element,offset:[0,-16]}).setLngLat([(west+east)/2,(south+north)/2]).addTo(instance));
+      }
+    });
+    return ()=>{disposed=true;markers.forEach(marker=>marker.remove());};
+  },[ready,militaryCounts,provinces,language]);
+
+  useEffect(()=>{
+    if(!ready||!airport?.coordinates||!map.current) return;
     map.current.easeTo({center:airport.coordinates,zoom:8,
       offset:window.innerWidth>760?[-90,0]:[0,-60],
       duration:window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:420});

@@ -29,9 +29,9 @@ El mapa base claro es Positron de [OpenFreeMap](https://openfreemap.org/quick_st
 
 La edición incluye también series de economía y turismo, electricidad, salud, educación, uso de Internet, telefonía, medioambiente y transporte aéreo. Las fechas de referencia pueden diferir por serie. Acceso a electricidad mide cobertura poblacional y no mide cortes, disponibilidad horaria ni déficit actual.
 
-## Aeropuertos civiles
+## Aeropuertos y aeródromos
 
-[OurAirports Open Data](https://github.com/davidmegginson/ourairports-data), Unlicense. Se seleccionan aeropuertos medianos y grandes con IATA y servicio programado marcado en la edición descargada. Los puntos son instalaciones civiles públicas. La capa no representa vuelos en vivo ni confirma horarios actuales. Reproducible con `python3 scripts/ingest_airports.py`.
+[OurAirports Open Data](https://github.com/davidmegginson/ourairports-data), Unlicense. Se publican los registros cubanos de la edición, descontando duplicados explícitos. El servicio programado refleja el campo del catálogo, sin confirmar horarios actuales. Los aeródromos civiles identificables tienen marcadores cuando la fuente aporta coordenadas. Las referencias militares se muestran por provincia, con el estado operativo sin verificar, y algunas se contrastan con [Cuba: A Country Study](https://tile.loc.gov/storage-services/master/frd/frdcstdy/cu/cubacountrystudy00huds/cubacountrystudy00huds.pdf). Los registros cerrados conservan su clasificación documental. Reproducible con `python3 scripts/ingest_airports.py`.
 
 ## Población efectiva provincial
 
@@ -48,3 +48,8 @@ ONEI, *Anuario Demográfico de Cuba 2024*, cuadro 1.2, p. 15. [Copia del informe
 ## Derechos humanos
 
 La sección cita los informes de [ONU](https://www.ohchr.org/en/hr-bodies/upr/cu-index) y [CIDH](https://oas.org/en/iachr/reports/ia.asp?Year=2025), y cifras atribuidas a las ediciones 2026 de [Freedom House](https://freedomhouse.org/country/cuba/freedom-world/2026) y [RSF](https://rsf.org/en/country/cuba). Son fuentes e índices distintos. CubaOS no los combina en una puntuación propia ni publica registros personales.
+
+
+## Quién es quién
+
+Selección editorial de cargos públicos nacionales, con enlaces a publicaciones que documentan cada cargo y la fecha de la publicación. Incluye Presidencia, Asamblea Nacional, Consejo de Ministros y ministerios. Los nombres y cargos se usan con fines informativos. Las fichas no contienen datos personales de contacto.

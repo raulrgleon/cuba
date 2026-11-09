@@ -98,7 +98,9 @@ export const themes={
   environment:{es:'Medioambiente',en:'Environment',icon:'◇'},
 } as const;
 export type Theme=keyof typeof themes;
-export type Airport={id:string;iata:string;name:string;town:string;coordinates:[number,number]};
+export type AirportCategory='scheduled'|'other'|'military'|'closed';
+export type Airport={id:string;iata:string;name:string;town:string;province:string;category:AirportCategory;
+  closed:boolean;coordinates:[number,number]|null;source:string};
 export type Airports={retrieved:string;source:string;license:string;airports:Airport[]};
 
 export type ProvincialPopulation={source:string;url:string;years:number[];totals:number[];territories:Record<string,number[]>};

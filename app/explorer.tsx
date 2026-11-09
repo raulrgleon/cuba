@@ -3,6 +3,7 @@
 import {useEffect,useMemo,useState} from 'react';
 import MapView from './map';
 import {Electricity,HumanRights,energyColor,type EnergyData} from './observatories';
+import {AirportDirectory,WhoIsWho,airportCategories} from './directories';
 import {areaKm2,displayName,searchFeatures,normalize,themes,placeKinds,type Place,type PlaceKind,type PlaceCollection,type ProvincialPopulation,type Airport,type Airports,type Theme,type Boundaries,type Boundary,type Indicator,type Level,type Sources} from './data';
 
 type Dataset={provinces:Boundaries;municipalities:Boundaries;indicators:Indicator[];sources:Sources;airports:Airports|null};
@@ -52,6 +53,9 @@ export default function Explorer() {
   const [panel,setPanel]=useState<'sources'|'favorites'|null>(null);
   const [favorites,setFavorites]=useState<string[]>([]);
   const [energyOpen,setEnergyOpen]=useState(false);
+  const [directory,setDirectory]=useState<'airports'|'offices'|null>(null);
+  const [militaryLayer,setMilitaryLayer]=useState(false);
+  const [airportProvince,setAirportProvince]=useState('');
   const [rightsOpen,setRightsOpen]=useState(false);
   const [energy,setEnergy]=useState<EnergyData|null>(null);
   const [energyDate,setEnergyDate]=useState('');
@@ -73,12 +77,14 @@ export default function Explorer() {
       getData<Boundaries>('adm2.geojson',controller.signal),
       getData<Indicator[]>('indicators.json?edition=themes-v2',controller.signal),
       getData<Sources>('sources.json?edition=themes-v2',controller.signal),
-      getData<Airports>('airports.json',controller.signal).catch(()=>null),
+      getData<Airports>('airports.json?edition=directory-v1',controller.signal).catch(()=>null),
       getData<ProvincialPopulation>('population-provinces.json',controller.signal).catch(()=>null),
     ]).then(([provinces,municipalities,indicators,sources,airports,provincialPopulation])=>{
       setPopulation(provincialPopulation);
       setData({provinces,municipalities,indicators,sources,airports});
       const view=new URLSearchParams(location.search);
+      if(view.get('directorio')==='aeropuertos')setDirectory('airports');
+      if(view.get('directorio')==='cargos')setDirectory('offices');
       const energyView=view.get('electricidad');
       if(energyView&&/^\d{4}-\d{2}-\d{2}$/.test(energyView)){
         setEnergyOpen(true);setEnergyDate(energyView);setShowInsights(true);
@@ -147,6 +153,13 @@ export default function Explorer() {
   const electricityColors=energyOpen&&energy?Object.fromEntries(energyProvinces.map(item=>[
     item.feature.id,energyColor(electricityRows?.[item.key]),
   ])):null;
+  const militaryCounts=useMemo(()=>{
+    const counts:Record<string,number>={};
+    for(const item of data?.airports?.airports??[]) {
+      if(item.category==='military'&&item.province)counts[item.province]=(counts[item.province]??0)+1;
+    }
+    return counts;
+  },[data]);
   const selectedProvince=selected?.properties.level==='ADM1'?displayName(selected):null;
   const populationIndex=population?.years.indexOf(populationYear)??-1;
   const provincePopulation=selectedProvince?population?.territories[selectedProvince]?.[populationIndex]:undefined;
@@ -204,7 +217,7 @@ export default function Explorer() {
 
   function chooseAirport(next:Airport) {
     chooseTheme('transport');
-    setSelected(null);setPlace(null);setAirport(next);setShowInsights(true);
+    setDirectory(null);setSelected(null);setPlace(null);setAirport(next);setShowInsights(true);
   }
 
   async function loadPlaces() {
@@ -227,6 +240,10 @@ export default function Explorer() {
 
   function choosePlace(next:Place) {
     setEnergyOpen(false);setPlace(next);setAirport(null);setSelected(null);setQuery('');setSearchOpen(false);setShowInsights(true);
+  }
+
+  function openDirectory(next:'airports'|'offices',province='') {
+    setAirportProvince(province);setDirectory(next);setRightsOpen(false);setPanel(null);
   }
 
   function pickIndicator(item:Indicator) {
@@ -286,10 +303,12 @@ export default function Explorer() {
     <nav className="observatory-nav" aria-label={language==='es'?'Observatorios':'Observatories'}>
       <button className={energyOpen?'active':''} aria-pressed={energyOpen} onClick={()=>{
         const open=!energyOpen||!showInsights;
-        setEnergyOpen(open);setRightsOpen(false);setShowInsights(open);
+        setEnergyOpen(open);setRightsOpen(false);setDirectory(null);setShowInsights(open);
         if(!energyOpen)setLevels(current=>({...current,ADM1:true}));
       }}>ϟ {language==='es'?'Observatorio eléctrico':'Electricity observatory'}</button>
-      <button className={rightsOpen?'active':''} aria-pressed={rightsOpen} onClick={()=>setRightsOpen(!rightsOpen)}>◎ {language==='es'?'Derechos humanos':'Human rights'}</button>
+      <button className={rightsOpen?'active':''} aria-pressed={rightsOpen} onClick={()=>{setDirectory(null);setRightsOpen(!rightsOpen);}}>◎ {language==='es'?'Derechos humanos':'Human rights'}</button>
+      <button aria-pressed={directory==='airports'} onClick={()=>directory==='airports'?setDirectory(null):openDirectory('airports')}>✈ {language==='es'?'Aeropuertos':'Airports'}</button>
+      <button aria-pressed={directory==='offices'} onClick={()=>directory==='offices'?setDirectory(null):openDirectory('offices')}>◇ {language==='es'?'Quién es quién':'Who is who'}</button>
     </nav>
     <div className="stat-strip" aria-label={language==='es'?'Indicadores nacionales':'National indicators'}>
       {themed.slice(0,3).map(item=>{
@@ -325,8 +344,11 @@ export default function Explorer() {
           <input type="checkbox" checked={levels[level]} onChange={event=>setLevels({...levels,[level]:event.target.checked})}/>
         </label>)}
         <h2 className="group-title">{language==='es'?'Transporte':'Transport'}</h2>
-        <label className="layer"><span className="layer-key airport-key"/><span>{language==='es'?'Aeropuertos civiles':'Civil airports'}<small>{data?.airports?.airports.length??'—'} · OurAirports</small></span>
+        <label className="layer"><span className="layer-key airport-key"/><span>{language==='es'?'Aeropuertos civiles':'Civil airports'}<small>{data?.airports?.airports.filter(item=>item.coordinates).length??'—'} · OurAirports</small></span>
           <input type="checkbox" checked={airportLayer} disabled={!data?.airports} onChange={event=>setAirportLayer(event.target.checked)}/></label>
+        <label className="layer"><span className="layer-key military-key"/><span>{language==='es'?'Aviación militar por provincia':'Military aviation by province'}<small>{language==='es'?'Referencias documentadas':'Documented references'}</small></span>
+          <input type="checkbox" checked={militaryLayer} disabled={!data?.airports} onChange={event=>setMilitaryLayer(event.target.checked)}/></label>
+        <button className="secondary" onClick={()=>openDirectory('airports')}>{language==='es'?'Catálogo de aeropuertos':'Airport directory'}</button>
         <h2 className="group-title">{language==='es'?'Visualización':'Visualization'}</h2>
         <div className="field"><label htmlFor="map-style">{language==='es'?'Mapa base':'Basemap'}</label>
           <select id="map-style" value={mapStyle} onChange={event=>setMapStyle(event.target.value as typeof mapStyle)}>
@@ -352,7 +374,7 @@ export default function Explorer() {
         <button className="secondary" onClick={resetMap}>⟲ {t.reset}</button>
         <div className="source-note"><span className="eyebrow">{t.boundary}</span><p>{t.note}</p></div>
       </aside>
-      {data?<MapView key={mapStyle} mapStyle={mapStyle} provinces={data.provinces} municipalities={data.municipalities} levels={levels} selected={selected} reset={reset} onSelect={pick} language={language} light={light} areas={areas} airports={airportLayer?data.airports?.airports:undefined} airport={airport} onAirport={chooseAirport} population={population} populationYear={populationYear} populationVisible={populationVisible&&!!population} place={place} places={places} placeLayers={placeLayers} onPlace={choosePlace} electricityColors={electricityColors} electricityDate={electricityDate}/>
+      {data?<MapView key={mapStyle} mapStyle={mapStyle} provinces={data.provinces} municipalities={data.municipalities} levels={levels} selected={selected} reset={reset} onSelect={pick} language={language} light={light} areas={areas} airports={airportLayer?data.airports?.airports:undefined} airport={airport} onAirport={chooseAirport} population={population} populationYear={populationYear} populationVisible={populationVisible&&!!population} place={place} places={places} placeLayers={placeLayers} onPlace={choosePlace} electricityColors={electricityColors} electricityDate={electricityDate} militaryCounts={militaryLayer?militaryCounts:null} onMilitary={province=>openDirectory('airports',province)}/>
         :<section className="map-zone map-placeholder">{loadError?<div><p>{t.fail}</p><button onClick={()=>{setLoadError(false);setAttempt(attempt+1);}}>{t.retry}</button></div>:t.load}</section>}
       {energyOpen&&showInsights&&<aside className="insights energy-insights" aria-label={language==='es'?'Observatorio eléctrico':'Electricity observatory'}>
         <button className="insights-close" onClick={()=>setShowInsights(false)} aria-label={t.close}>×</button>
@@ -364,10 +386,10 @@ export default function Explorer() {
       </aside>}
       <aside className={showInsights&&!energyOpen?'insights':'insights insights-closed'}>
         <button className="insights-close" onClick={()=>setShowInsights(false)} aria-label={t.close}>×</button>
-        <p className="eyebrow"><i/>{place?placeKinds[place.properties.kind][language]:airport?(language==='es'?'Aeropuerto civil':'Civil airport'):selected?t.territory:t.overview}</p>
+        <p className="eyebrow"><i/>{place?placeKinds[place.properties.kind][language]:airport?airportCategories[airport.category][language]:selected?t.territory:t.overview}</p>
         <h2>{place?place.properties.name:airport?airport.name:selected?displayName(selected):t.national}</h2>
         {place&&<p className="muted"><a href={'https://www.openstreetmap.org/'+place.id}>OpenStreetMap ↗</a> · {places?.metadata.snapshot}</p>}
-        {airport&&<p className="muted">{airport.iata} · {airport.town} · <a href={data?.airports?.source}>OurAirports ↗</a></p>}
+        {airport&&<p className="muted">{[airport.iata,airport.town,airport.province].filter(Boolean).join(' · ')} · <a href={airport.source}>{t.sources} ↗</a></p>}
         {selected&&<div className="territory-actions"><button onClick={save}>{isSaved?'★':'☆'} {isSaved?t.remove:t.save}</button><button onClick={resetMap}>{t.reset}</button></div>}
         {selected&&<p className="muted">{new Intl.NumberFormat(language,{maximumFractionDigits:0}).format(areaKm2(selected))} km² · {language==='es'?'superficie aproximada':'approximate area'}</p>}
         {provincePopulation!==undefined&&selectedProvince&&<div className="metric provincial-metric"><p className="eyebrow">{language==='es'?'Población efectiva':'Effective population'} · {populationYear}</p><strong>{new Intl.NumberFormat(language).format(provincePopulation)}</strong><a href={population?.url}>ONEI ↗</a>
@@ -407,7 +429,8 @@ export default function Explorer() {
           <p className="attribution"><a href={series.url} target="_blank" rel="noreferrer">World Development Indicators ↗</a><br/>{t.sourceDate} · {series.updated}</p>
         </section>}
         {theme==='transport'&&data?.airports&&<details className="airport-list"><summary>{language==='es'?'Aeropuertos en el mapa':'Airports on the map'}</summary>
-          {data.airports.airports.map(item=><button key={item.id} onClick={()=>chooseAirport(item)}>{item.iata} · {item.name}</button>)}
+          {data.airports.airports.filter(item=>item.category==='scheduled').map(item=><button key={item.id} onClick={()=>chooseAirport(item)}>{item.iata} · {item.name}</button>)}
+          <button onClick={()=>openDirectory('airports')}>{language==='es'?'Ver catálogo completo':'View full directory'}</button>
           <p className="muted">{language==='es'?'Edición consultada':'Snapshot retrieved'} · {data.airports.retrieved}</p>
         </details>}
       </aside>
@@ -426,6 +449,12 @@ export default function Explorer() {
       <button className="mobile-data" onClick={()=>setShowInsights(!showInsights)} aria-expanded={showInsights}>{language==='es'?'Temas y datos':'Topics and data'}</button>
     </main>
     <footer className="footer"><span>© OpenStreetMap contributors · geoBoundaries · ODbL 1.0</span><span>{data&&`${t.received} · ${data.sources.retrieved}`}</span></footer>
+    {directory&&<section className="drawer civic-drawer" aria-label={directory==='airports'?(language==='es'?'Catálogo de aeropuertos':'Airport directory'):(language==='es'?'Quién es quién':'Who is who')}>
+      <div className="drawer-title"><h2>{directory==='airports'?(language==='es'?'Catálogo de aeropuertos':'Airport directory'):(language==='es'?'Quién es quién':'Who is who')}</h2><button onClick={()=>setDirectory(null)}>{t.close}</button></div>
+      {directory==='offices'?<WhoIsWho language={language}/>:data?.airports
+        ?<AirportDirectory key={airportProvince} data={data.airports} language={language} onSelect={chooseAirport} initialProvince={airportProvince}/>
+        :<p>{language==='es'?'Catálogo no disponible.':'Directory unavailable.'}</p>}
+    </section>}
     {rightsOpen&&<section className="drawer rights-drawer" aria-label={language==='es'?'Derechos humanos':'Human rights'}>
       <div className="drawer-title"><h2>{language==='es'?'Derechos humanos':'Human rights'}</h2><button onClick={()=>setRightsOpen(false)}>{t.close}</button></div>
       <HumanRights language={language}/>

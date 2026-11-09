@@ -44,10 +44,14 @@ class PublicSnapshots(unittest.TestCase):
     def test_airports_are_unique_and_in_cuba(self):
         snapshot = json.loads((DATA / "airports.json").read_text())
         airports = snapshot["airports"]
-        self.assertGreaterEqual(len(airports), 8)
-        self.assertEqual(len({item["iata"] for item in airports}), len(airports))
-        self.assertTrue(all(len(item["iata"]) == 3 and -86 < item["coordinates"][0] < -73
-                            and 18 < item["coordinates"][1] < 25 for item in airports))
+        self.assertGreaterEqual(len(airports), 100)
+        self.assertEqual(len({item["id"] for item in airports}), len(airports))
+        self.assertTrue({"scheduled","other","military","closed"}.issubset({item["category"] for item in airports}))
+        military = [item for item in airports if item["category"]=="military"]
+        self.assertTrue(any(item["province"]=="Artemisa" for item in military))
+        self.assertTrue(all(item["coordinates"] is None and not item["town"] for item in military))
+        self.assertTrue(all(-86 < item["coordinates"][0] < -73 and 18 < item["coordinates"][1] < 25
+                            for item in airports if item["coordinates"]))
 
     def test_provincial_population_and_open_map_layers(self):
         population = json.loads((DATA / "population-provinces.json").read_text())
