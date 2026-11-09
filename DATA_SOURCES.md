@@ -21,3 +21,7 @@ El manifiesto `public/data/sources.json` identifica la edición, los archivos ex
 - [MapLibre GL JS](https://github.com/maplibre/maplibre-gl-js/blob/v6.17.0/LICENSE.txt), BSD-3-Clause.
 - [Next.js](https://github.com/vercel/next.js/blob/canary/license.md) y [React](https://github.com/facebook/react/blob/main/LICENSE), MIT.
 - Las versiones fijadas y las dependencias transitivas constan en `package-lock.json`.
+
+## Mapa base y superficie
+
+El mapa base claro es Positron de [OpenFreeMap](https://openfreemap.org/quick_start/), © OpenMapTiles y © colaboradores de OpenStreetMap. Si el proveedor no está disponible, se dibuja un contexto regional local de [Natural Earth](https://www.naturalearthdata.com/about/terms-of-use/), dominio público. Se puede reconstruir con `python3 scripts/ingest_context.py`. Las superficies en km² se calculan sobre los polígonos simplificados mediante una aproximación esférica. La leyenda muestra intervalos de superficie, no población ni cifras oficiales de extensión territorial.

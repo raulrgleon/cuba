@@ -65,3 +65,24 @@ export function searchFeatures(features:Boundary[], value:string) {
     return {feature,rank};
   }).filter(row=>row.rank<4).sort((a,b)=>a.rank-b.rank).slice(0,9).map(row=>row.feature);
 }
+
+export const areaPalette=['#bfd8ef','#9ec5e9','#76aade','#4c88c3','#31649b'];
+export const areaBreaks=[1000,3000,6000,9000];
+
+export function areaKm2(feature:Boundary) {
+  const radians=Math.PI/180;
+  const polygons=feature.geometry.type==='Polygon'?[feature.geometry.coordinates]:feature.geometry.coordinates;
+  return polygons.reduce((total,polygon)=>total+polygon.reduce((area,ring,index)=>{
+    let sum=0;
+    for(let i=1;i<ring.length;i++){
+      const [x1,y1]=ring[i-1], [x2,y2]=ring[i];
+      sum+=(x2-x1)*radians*(Math.sin(y1*radians)+Math.sin(y2*radians));
+    }
+    return area+(index===0?1:-1)*Math.abs(sum)*6371**2/2;
+  },0),0);
+}
+
+export function areaColor(feature:Boundary) {
+  const area=areaKm2(feature);
+  return areaPalette[areaBreaks.filter(limit=>area>=limit).length];
+}

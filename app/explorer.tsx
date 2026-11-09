@@ -2,7 +2,7 @@
 
 import {useEffect,useMemo,useState} from 'react';
 import MapView from './map';
-import {displayName,searchFeatures,type Boundaries,type Boundary,type Indicator,type Level,type Sources} from './data';
+import {areaKm2,displayName,searchFeatures,type Boundaries,type Boundary,type Indicator,type Level,type Sources} from './data';
 
 type Dataset={provinces:Boundaries;municipalities:Boundaries;indicators:Indicator[];sources:Sources};
 
@@ -29,7 +29,9 @@ export default function Explorer() {
   const [loadError,setLoadError]=useState(false);
   const [attempt,setAttempt]=useState(0);
   const [language,setLanguage]=useState<'es'|'en'>('es');
-  const [light,setLight]=useState(false);
+  const [light,setLight]=useState(true);
+  const [areas,setAreas]=useState(true);
+  const [showInsights,setShowInsights]=useState(false);
   const [levels,setLevels]=useState<Record<Level,boolean>>({ADM1:true,ADM2:false});
   const [selected,setSelected]=useState<Boundary|null>(null);
   const [reset,setReset]=useState(0);
@@ -40,7 +42,7 @@ export default function Explorer() {
   const [indicatorId,setIndicatorId]=useState('SP.POP.TOTL');
   const [year,setYear]=useState('');
   const [notice,setNotice]=useState('');
-  const [toolsOpen,setToolsOpen]=useState(false);
+  const [toolsOpen,setToolsOpen]=useState(true);
   const t=label[language];
 
   useEffect(()=>{
@@ -56,6 +58,7 @@ export default function Explorer() {
       const feature=[...provinces.features,...municipalities.features].find(item=>item.id===view.get('territorio'));
       if(feature) {
         setSelected(feature);
+        setShowInsights(true);
         if(feature.properties.level==='ADM2') setLevels({ADM1:true,ADM2:true});
       }
       if(indicators.some(item=>item.id===view.get('indicador'))) setIndicatorId(view.get('indicador')!);
@@ -69,12 +72,13 @@ export default function Explorer() {
     try {
       const saved=JSON.parse(localStorage.getItem('cubaos-favorites')||'[]');
       if(Array.isArray(saved)) setFavorites(saved.filter(id=>typeof id==='string'));
-      setLight(localStorage.getItem('cubaos-theme')==='light');
+      setLight(localStorage.getItem('cubaos-theme')!=='dark');
       if(localStorage.getItem('cubaos-language')==='en') setLanguage('en');
     } catch {}
   },[]);
 
   useEffect(()=>{document.documentElement.lang=language;},[language]);
+  useEffect(()=>{if(window.matchMedia('(max-width: 760px)').matches)setToolsOpen(false);},[]);
 
   const features=useMemo(()=>data?[...data.provinces.features,...data.municipalities.features]:[],[data]);
   const results=useMemo(()=>searchFeatures(features,query),[features,query]);
@@ -87,6 +91,7 @@ export default function Explorer() {
 
   function pick(feature:Boundary) {
     setSelected(feature);
+    setShowInsights(true);
     setLevels(current=>({...current,[feature.properties.level]:true}));
     setSearchOpen(false);
     setQuery('');
@@ -113,7 +118,7 @@ export default function Explorer() {
     catch {setNotice(t.copyError);}
   }
 
-  function resetMap() {setSelected(null);setReset(current=>current+1);}
+  function resetMap() {setSelected(null);setShowInsights(false);setReset(current=>current+1);}
 
   return <div className={light?'shell light':'shell'}>
     <header className="topbar">
@@ -143,10 +148,28 @@ export default function Explorer() {
         <button aria-label={language==='es'?'Switch to English':'Cambiar a español'} onClick={()=>{const next=language==='es'?'en':'es';setLanguage(next);remember('cubaos-language',next);}}>{language==='es'?'EN':'ES'}</button>
       </nav>
     </header>
+    <div className="stat-strip" aria-label={language==='es'?'Indicadores nacionales':'National indicators'}>
+      {data?.indicators.map(item=>{
+        const latest=item.observations.at(-1);
+        return <button key={item.id} onClick={()=>{setIndicatorId(item.id);setYear('');setShowInsights(true);}}>
+          <span>{language==='es'?item.label:item.labelEn}</span>
+          <strong>{latest&&new Intl.NumberFormat(language,{maximumFractionDigits:2}).format(latest.value)} {item.id==='SP.POP.TOTL'?'':'%'}</strong>
+          <small>{latest?.year} · WDI</small>
+        </button>;
+      })}
+    </div>
     <p className={notice?'notice':'sr-only'} role="status" onClick={()=>setNotice('')}>{notice}</p>
     <main className="workspace">
+      <nav className="section-nav" aria-label={language==='es'?'Explorar CubaOS':'Explore CubaOS'}>
+        <p>{language==='es'?'EXPLORAR':'EXPLORE'}</p>
+        <button onClick={resetMap}>◉ {t.map}</button>
+        <button onClick={()=>{setToolsOpen(!toolsOpen);}} aria-expanded={toolsOpen}>▱ {t.layers}</button>
+        <p>{language==='es'?'DATOS':'DATA'}</p>
+        <button onClick={()=>setShowInsights(!showInsights)} aria-expanded={showInsights}>◫ {language==='es'?'Demografía':'Demographics'}</button>
+        <button onClick={()=>setPanel('sources')}>◎ {t.sources}</button>
+      </nav>
       <button className="mobile-tools" onClick={()=>setToolsOpen(!toolsOpen)} aria-expanded={toolsOpen}>{t.menu}</button>
-      <aside className={toolsOpen?'rail tools-open':'rail'}>
+      <aside className={toolsOpen?'rail':'rail tools-closed'}>
         <div className="eyebrow"><i/>{t.map}</div>
         <h1>{t.layers}</h1>
         <p className="muted">{t.select}</p>
@@ -156,15 +179,19 @@ export default function Explorer() {
           <span>{level==='ADM1'?t.provinces:t.municipalities}<small>{level}</small></span>
           <input type="checkbox" checked={levels[level]} onChange={event=>setLevels({...levels,[level]:event.target.checked})}/>
         </label>)}
+        <h2 className="group-title">{language==='es'?'Visualización':'Visualization'}</h2>
+        <label className="layer"><span className="layer-key area-key"/><span>{language==='es'?'Superficie':'Area'}<small>km²</small></span><input type="checkbox" checked={areas} onChange={event=>setAreas(event.target.checked)}/></label>
         <button className="secondary" onClick={resetMap}>⟲ {t.reset}</button>
         <div className="source-note"><span className="eyebrow">{t.boundary}</span><p>{t.note}</p></div>
       </aside>
-      {data?<MapView provinces={data.provinces} municipalities={data.municipalities} levels={levels} selected={selected} reset={reset} onSelect={pick} language={language} light={light}/>
+      {data?<MapView provinces={data.provinces} municipalities={data.municipalities} levels={levels} selected={selected} reset={reset} onSelect={pick} language={language} light={light} areas={areas}/>
         :<section className="map-zone map-placeholder">{loadError?<div><p>{t.fail}</p><button onClick={()=>{setLoadError(false);setAttempt(attempt+1);}}>{t.retry}</button></div>:t.load}</section>}
-      <aside className="insights">
+      <aside className={showInsights?'insights':'insights insights-closed'}>
+        <button className="insights-close" onClick={()=>setShowInsights(false)} aria-label={t.close}>×</button>
         <p className="eyebrow"><i/>{selected?t.territory:t.overview}</p>
         <h2>{selected?displayName(selected):t.national}</h2>
         {selected&&<div className="territory-actions"><button onClick={save}>{isSaved?'★':'☆'} {isSaved?t.remove:t.save}</button><button onClick={resetMap}>{t.reset}</button></div>}
+        {selected&&<p className="muted">{new Intl.NumberFormat(language,{maximumFractionDigits:0}).format(areaKm2(selected))} km² · {language==='es'?'superficie aproximada':'approximate area'}</p>}
         {selected&&<p className="muted">{t.noLocal}</p>}
         <div className="divider"/>
         {series&&<section className="indicator">

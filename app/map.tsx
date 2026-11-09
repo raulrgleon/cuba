@@ -1,12 +1,12 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
-import type {Map as MapLibre} from 'maplibre-gl';
-import {bounds,displayName,extent,type Boundaries,type Boundary,type Level} from './data';
+import type {Map as MapLibre, StyleSpecification} from 'maplibre-gl';
+import {areaColor,areaPalette,bounds,displayName,extent,type Boundaries,type Boundary,type Level} from './data';
 
 type Props = {
   provinces:Boundaries; municipalities:Boundaries; levels:Record<Level,boolean>;
   selected:Boundary|null; onSelect:(feature:Boundary)=>void; reset:number;
-  language:'es'|'en'; light:boolean;
+  language:'es'|'en'; light:boolean; areas:boolean;
 };
 
 function boundaryPath(feature:Boundary) {
@@ -15,7 +15,7 @@ function boundaryPath(feature:Boundary) {
     `${index?'L':'M'}${(x*100).toFixed(2)} ${(-y*100).toFixed(2)}`).join('')+'Z')).join('');
 }
 
-function SimpleMap({provinces,municipalities,levels,selected,onSelect}:Props) {
+function SimpleMap({provinces,municipalities,levels,selected,onSelect,areas}:Props) {
   const paths=useMemo(()=>[...provinces.features,...municipalities.features].map(feature=>({
     feature,path:boundaryPath(feature),
   })),[provinces,municipalities]);
@@ -24,7 +24,7 @@ function SimpleMap({provinces,municipalities,levels,selected,onSelect}:Props) {
   return <svg className="map-overview" viewBox={`${(west-pad)*100} ${-(north+pad)*100} ${(east-west+2*pad)*100} ${(north-south+2*pad)*100}`} aria-label="Cuba">
     {paths.filter(({feature})=>levels[feature.properties.level]).map(({feature,path})=>
       <path key={feature.id} d={path} className={`boundary ${feature.properties.level}${feature.id===selected?.id?' selected':''}`}
-        vectorEffect="non-scaling-stroke" fillRule="evenodd" onClick={()=>onSelect(feature)}>
+        style={feature.properties.level==='ADM1'&&areas?{fill:areaColor(feature)}:undefined} vectorEffect="non-scaling-stroke" fillRule="evenodd" onClick={()=>onSelect(feature)}>
         <title>{displayName(feature)}</title>
       </path>)}
   </svg>;
@@ -37,38 +37,63 @@ export default function MapView(props:Props) {
   useEffect(()=>{latest.current=props;},[props]);
   const [ready,setReady]=useState(false);
   const [error,setError]=useState(false);
+  const [basemap,setBasemap]=useState(false);
   const [coords,setCoords]=useState('22.00° N · 79.50° W');
-  const {provinces,municipalities,levels,selected,reset,language,light}=props;
+  const {provinces,municipalities,levels,selected,reset,language,light,areas}=props;
 
   useEffect(()=>{
     let disposed=false;
-    import('maplibre-gl').then(({Map,NavigationControl,ScaleControl,setWorkerUrl,setWorkerCount})=>{
+    const base=fetch('https://tiles.openfreemap.org/styles/positron',{signal:AbortSignal.timeout(3200)})
+      .then(response=>response.ok?response.json() as Promise<StyleSpecification>:null).catch(()=>null);
+    Promise.all([import('maplibre-gl'),base]).then(([{Map,Marker,NavigationControl,ScaleControl,setWorkerUrl,setWorkerCount},background])=>{
       if(disposed||!host.current) return;
       const initial=latest.current;
       setWorkerUrl('/vendor/maplibre-worker.mjs');
       setWorkerCount(2);
+      const palette:StyleSpecification['layers']=[
+        {id:'province-fill',type:'fill',source:'ADM1',paint:{'fill-color':['get','areaColor'],'fill-opacity':.78}},
+        {id:'province-edge',type:'line',source:'ADM1',paint:{'line-color':'#e2eff8','line-width':1.1}},
+        {id:'municipality-fill',type:'fill',source:'ADM2',paint:{'fill-color':'#397ab1','fill-opacity':.18}},
+        {id:'municipality-edge',type:'line',source:'ADM2',paint:{'line-color':'#315f8a','line-opacity':.62,'line-width':.8}},
+        {id:'selection-province',type:'line',source:'ADM1',filter:['==',['id'],''],paint:{'line-color':'#254b72','line-width':3}},
+        {id:'selection-municipality',type:'line',source:'ADM2',filter:['==',['id'],''],paint:{'line-color':'#254b72','line-width':3}},
+      ];
+      const provinceData={...initial.provinces,features:initial.provinces.features.map(feature=>({
+        ...feature,properties:{...feature.properties,areaColor:areaColor(feature)},
+      }))};
+      const baselayers:StyleSpecification['layers']=background?.layers??[
+        {id:'sea',type:'background',paint:{'background-color':'#d7e2e5'}},
+        {id:'regional-land',type:'fill',source:'caribbean',paint:{'fill-color':'#f2f2eb'}},
+        {id:'regional-outline',type:'line',source:'caribbean',paint:{'line-color':'#bec7ca','line-width':.7}},
+      ];
+      const labels=baselayers.findIndex(layer=>layer.type==='symbol');
+      const split=labels<0?baselayers.length:labels;
+      setBasemap(Boolean(background));
       const instance=new Map({
         container:host.current,
-        style:{version:8,sources:{
-          ADM1:{type:'geojson',data:initial.provinces},
+        style:{...background,version:8,sources:{...background?.sources,
+          ...(!background?{caribbean:{type:'geojson' as const,data:'/data/caribbean.geojson'}}:{}),
+          ADM1:{type:'geojson',data:provinceData},
           ADM2:{type:'geojson',data:initial.municipalities},
-        },layers:[
-          {id:'sea',type:'background',paint:{'background-color':'#0b1b25'}},
-          {id:'province-fill',type:'fill',source:'ADM1',paint:{'fill-color':'#397b6b','fill-opacity':.94}},
-          {id:'province-edge',type:'line',source:'ADM1',paint:{'line-color':'#78c5aa','line-width':1.15}},
-          {id:'municipality-fill',type:'fill',source:'ADM2',paint:{'fill-color':'#68ceaf','fill-opacity':.13}},
-          {id:'municipality-edge',type:'line',source:'ADM2',paint:{'line-color':'#b0d9cb','line-opacity':.72,'line-width':.85}},
-          {id:'selection-province',type:'line',source:'ADM1',filter:['==',['id'],''],paint:{'line-color':'#ffcd75','line-width':2.8}},
-          {id:'selection-municipality',type:'line',source:'ADM2',filter:['==',['id'],''],paint:{'line-color':'#ffcd75','line-width':2.8}},
-        ]},
-        bounds,fitBoundsOptions:{padding:36},maxZoom:13,minZoom:3,
+        },layers:[...baselayers.slice(0,split),...palette,...baselayers.slice(split)]},
+        bounds,fitBoundsOptions:{padding:76},maxZoom:13,minZoom:3,
         attributionControl:false,dragRotate:false,touchPitch:false,
       });
       map.current=instance;
-      instance.addControl(new NavigationControl({showCompass:false}),'top-right');
+      instance.addControl(new NavigationControl({showCompass:false}),'bottom-right');
       instance.addControl(new ScaleControl({unit:'metric'}),'bottom-left');
-      instance.on('load',()=>{
+      instance.once('style.load',()=>{
         setReady(true);
+        const named=new Set(['La Habana','Pinar del Río','Matanzas','Villa Clara','Camagüey','Holguín','Santiago de Cuba','Isla de la Juventud']);
+        for(const feature of initial.provinces.features) {
+          const name=displayName(feature);
+          if(!named.has(name)) continue;
+          const [[west,south],[east,north]]=extent(feature);
+          const element=document.createElement('span');
+          element.className='province-label';
+          element.textContent=name;
+          new Marker({element}).setLngLat([(west+east)/2,(south+north)/2]).addTo(instance);
+        }
         instance.on('click',event=>{
           const active=latest.current;
           const query=[...(active.levels.ADM2?['municipality-fill']:[]),...(active.levels.ADM1?['province-fill']:[])];
@@ -98,15 +123,21 @@ export default function MapView(props:Props) {
     ] as const) {
       for(const id of ids) instance.setLayoutProperty(id,'visibility',active?'visible':'none');
     }
-    instance.setPaintProperty('sea','background-color',light?'#d5e9eb':'#0b1b25');
-  },[ready,levels,light]);
+    if(instance.getLayer('sea')){
+      instance.setPaintProperty('sea','background-color',light?'#d7e2e5':'#142632');
+      instance.setPaintProperty('regional-land','fill-color',light?'#f2f2eb':'#293b42');
+    }
+    instance.setPaintProperty('province-fill','fill-color',areas?['get','areaColor']:'#86add1');
+  },[ready,levels,light,areas]);
 
   useEffect(()=>{
     const instance=map.current;
     if(!ready||!instance) return;
     instance.setFilter('selection-province',['==',['id'],selected?.properties.level==='ADM1'?selected.id:'']);
     instance.setFilter('selection-municipality',['==',['id'],selected?.properties.level==='ADM2'?selected.id:'']);
-    instance.fitBounds(selected?extent(selected):bounds,{padding:52,duration:window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:450,maxZoom:11});
+    const wide=window.innerWidth>760;
+    const padding=wide?{top:54,bottom:62,left:225,right:selected?310:76}:46;
+    instance.fitBounds(selected?extent(selected):bounds,{padding,duration:window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:450,maxZoom:11});
   },[ready,selected,reset]);
 
   return <section className="map-zone" aria-label={language==='es'?'Mapa interactivo de Cuba':'Interactive map of Cuba'}>
@@ -115,5 +146,12 @@ export default function MapView(props:Props) {
     <div className="map-caption"><span className="map-dot"/> {language==='es'?'ARCHIPIÉLAGO CUBANO':'CUBAN ARCHIPELAGO'}</div>
     {error&&!ready&&<span className="map-fallback-note">{language==='es'?'Mapa vectorial básico':'Basic vector map'}</span>}
     <span className="map-coordinates">{coords}</span>
+    {areas&&levels.ADM1&&<div className="map-legend">
+      <strong>{language==='es'?'Superficie aproximada':'Approximate area'} · km²</strong>
+      <div className="legend-colors">{areaPalette.map(color=><i key={color} style={{background:color}}/>)}</div>
+      <div className="legend-values"><span>&lt;1 000</span><span>≥9 000</span></div>
+    </div>}
+    {!basemap&&ready&&<div className="base-credits"><a href="https://www.naturalearthdata.com/">Natural Earth</a></div>}
+    {basemap&&ready&&<div className="base-credits"><a href="https://openfreemap.org/">OpenFreeMap</a> · © <a href="https://openmaptiles.org/">OpenMapTiles</a> · © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a></div>}
   </section>;
 }
