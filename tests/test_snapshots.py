@@ -29,12 +29,22 @@ class PublicSnapshots(unittest.TestCase):
 
     def test_series_metadata_and_years(self):
         indicators = json.loads((DATA / "indicators.json").read_text())
-        self.assertEqual(len(indicators), 3)
+        self.assertGreaterEqual(len(indicators), 16)
+        self.assertEqual({series["category"] for series in indicators},
+                         {"people", "economy", "energy", "health", "education", "connectivity", "environment", "transport"})
         for series in indicators:
             self.assertEqual(series["geography"], "CUB")
-            self.assertEqual(series["status"], "estimate")
+            self.assertEqual(series["status"], "published")
             self.assertTrue(series["url"].startswith("https://data.worldbank.org/"))
             self.assertTrue(series["license"])
             years = [row["year"] for row in series["observations"]]
             self.assertEqual(years, sorted(set(years)))
-            self.assertGreater(len(years), 20)
+            self.assertGreaterEqual(len(years), 1)
+
+    def test_airports_are_unique_and_in_cuba(self):
+        snapshot = json.loads((DATA / "airports.json").read_text())
+        airports = snapshot["airports"]
+        self.assertGreaterEqual(len(airports), 8)
+        self.assertEqual(len({item["iata"] for item in airports}), len(airports))
+        self.assertTrue(all(len(item["iata"]) == 3 and -86 < item["coordinates"][0] < -73
+                            and 18 < item["coordinates"][1] < 25 for item in airports))

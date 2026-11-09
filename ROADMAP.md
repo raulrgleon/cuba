@@ -17,7 +17,8 @@
 
 ## Fases 3 y 4 · Observatorios y herramientas GIS
 
-- [ ] Publicar módulos temáticos conforme se validen sus fuentes y licencias.
+- [x] Series históricas de ocho temas y capa de aeropuertos civiles.
+- [ ] Incorporar otras capas temáticas conforme se validen sus fuentes y licencias.
 - [ ] Incorporar páginas por territorio, cartografía temporal, mediciones y API con filtros.
 - [ ] Evaluar búsqueda semántica e IA opcional sobre observaciones citables.
 - [ ] Medir Lighthouse y auditar accesibilidad antes de declarar objetivos de rendimiento o conformidad.

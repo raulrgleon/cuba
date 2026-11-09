@@ -1,6 +1,6 @@
 # CubaOS
 
-Explorador de Cuba con mapa vectorial, provincias, municipios y series nacionales de población. Disponible en https://cuba.dnet.llc.
+Explorador de Cuba con mapa vectorial, provincias, municipios y series nacionales en ocho áreas y una capa de aeropuertos civiles. Disponible en https://cuba.dnet.llc.
 
 ## Ejecutar
 
@@ -18,7 +18,7 @@ El servidor de desarrollo usa el puerto 3000. La compilación genera `out/`. El 
 
 ## Datos y mantenimiento
 
-El mapa usa una edición de límites administrativos de geoBoundaries. Las series nacionales proceden del Banco Mundial. Los datos municipales y provinciales se limitan a geometrías. Actualiza las fuentes con `python3 scripts/ingest.py`, inspecciona el diff y ejecuta las pruebas antes de publicar. Cada edición contiene procedencia, años y hashes. Consulta [DATA_SOURCES.md](DATA_SOURCES.md) y [API.md](API.md).
+El mapa usa una edición de límites administrativos de geoBoundaries. Las series nacionales proceden del Banco Mundial. La capa de aeropuertos procede de OurAirports. Los datos municipales y provinciales se limitan a geometrías. Actualiza las fuentes con `python3 scripts/ingest.py`, inspecciona el diff y ejecuta las pruebas antes de publicar. Cada edición contiene procedencia, años y hashes. Consulta [DATA_SOURCES.md](DATA_SOURCES.md) y [API.md](API.md).
 
 ## Despliegue
 

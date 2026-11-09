@@ -7,20 +7,46 @@ import math
 import pathlib
 import sqlite3
 import urllib.request
+import urllib.error
+import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 TARGET = ROOT / "public" / "data"
 WDI = {
-    "SP.POP.TOTL": ("Población total", "Total population", "personas", "people"),
-    "SP.POP.GROW": ("Crecimiento de población", "Population growth", "% anual", "% per year"),
-    "SP.URB.TOTL.IN.ZS": ("Población urbana", "Urban population", "% del total", "% of total"),
+    "SP.POP.TOTL": ("people", "Población total", "Total population", "personas", "people"),
+    "SP.POP.GROW": ("people", "Crecimiento de población", "Population growth", "% anual", "% per year"),
+    "SP.URB.TOTL.IN.ZS": ("people", "Población urbana", "Urban population", "% del total", "% of total"),
+    "SP.POP.65UP.TO.ZS": ("people", "Población de 65 años o más", "Population aged 65 and over", "% del total", "% of total"),
+    "SM.POP.NETM": ("people", "Migración neta", "Net migration", "personas", "people"),
+    "NY.GDP.MKTP.CD": ("economy", "PIB a precios corrientes", "GDP at current prices", "USD corrientes", "current USD"),
+    "NY.GDP.MKTP.KD.ZG": ("economy", "Crecimiento real del PIB", "Real GDP growth", "% anual", "% per year"),
+    "SL.UEM.TOTL.ZS": ("economy", "Desempleo", "Unemployment", "% de la fuerza laboral", "% of labor force"),
+    "ST.INT.ARVL": ("economy", "Llegadas turísticas internacionales", "International tourist arrivals", "llegadas", "arrivals"),
+    "EG.ELC.ACCS.ZS": ("energy", "Acceso a electricidad", "Access to electricity", "% de la población", "% of population"),
+    "EG.ELC.RNWX.ZS": ("energy", "Generación renovable sin hidroeléctrica", "Non-hydro renewable electricity", "% de la generación", "% of generation"),
+    "SP.DYN.LE00.IN": ("health", "Esperanza de vida al nacer", "Life expectancy at birth", "años", "years"),
+    "SP.DYN.IMRT.IN": ("health", "Mortalidad infantil", "Infant mortality", "por 1.000 nacidos vivos", "per 1,000 live births"),
+    "SH.MED.PHYS.ZS": ("health", "Médicos", "Physicians", "por 1.000 personas", "per 1,000 people"),
+    "SE.PRM.ENRR": ("education", "Matrícula bruta en primaria", "Gross primary enrollment", "% bruto", "gross %"),
+    "SE.TER.ENRR": ("education", "Matrícula bruta terciaria", "Gross tertiary enrollment", "% bruto", "gross %"),
+    "IT.NET.USER.ZS": ("connectivity", "Personas que usan Internet", "People using the Internet", "% de la población", "% of population"),
+    "IT.CEL.SETS.P2": ("connectivity", "Suscripciones móviles", "Mobile subscriptions", "por 100 personas", "per 100 people"),
+    "AG.LND.FRST.ZS": ("environment", "Superficie forestal", "Forest area", "% de la superficie terrestre", "% of land area"),
+    "EN.GHG.CO2.PC.CE.AR5": ("environment", "Emisiones de CO₂ por persona", "CO₂ emissions per capita", "t de CO₂e por persona", "t CO₂e per person"),
+    "IS.AIR.PSGR": ("transport", "Pasajeros de aerolíneas registradas en Cuba", "Passengers carried by Cuba-registered airlines", "pasajeros", "passengers"),
 }
 
 
 def fetch(url):
     request = urllib.request.Request(url, headers={"User-Agent": "CubaOS/0.1"})
-    with urllib.request.urlopen(request, timeout=35) as response:
-        return json.load(response)
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(request, timeout=15) as response:
+                return json.load(response)
+        except (OSError, urllib.error.URLError) as error:
+            if attempt == 2:
+                raise RuntimeError(f"Could not fetch {url}: {error}") from error
+            time.sleep(attempt + 1)
 
 
 def boundary(level):
@@ -74,8 +100,8 @@ def indicator(item):
     if not rows or len({row["year"] for row in rows}) != len(rows):
         raise ValueError(f"Empty or duplicate observations: {identifier}")
     return {
-        "id": identifier, "label": labels[0], "labelEn": labels[1],
-        "unit": labels[2], "unitEn": labels[3], "geography": "CUB", "status": "estimate",
+        "id": identifier, "category": labels[0], "label": labels[1], "labelEn": labels[2],
+        "unit": labels[3], "unitEn": labels[4], "geography": "CUB", "status": "published",
         "source": "Banco Mundial / World Development Indicators", "license": "CC BY 4.0",
         "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
         "url": f"https://data.worldbank.org/indicator/{identifier}?locations=CU",

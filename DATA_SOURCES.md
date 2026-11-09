@@ -6,9 +6,9 @@
 - [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/), © [colaboradores de OpenStreetMap](https://www.openstreetmap.org/copyright). Se normalizan los atributos al nombre, identificador y nivel. La edición derivada está disponible bajo ODbL como GeoJSON en `/data/adm1.geojson` y `/data/adm2.geojson`.
 - Los 16 elementos ADM1 incluyen la unidad de primer nivel Isla de la Juventud. Los 168 elementos ADM2 corresponden a la clasificación de la fuente, sin inferir equivalencias históricas ni afiliaciones a partir de geometrías superpuestas.
 
-## Indicadores demográficos nacionales
+## Indicadores nacionales
 
-Banco Mundial, World Development Indicators, CC BY 4.0. La edición conserva el año de observación y la fecha de actualización de la fuente. Los valores se publican como estimaciones nacionales.
+Banco Mundial, World Development Indicators, CC BY 4.0. La edición conserva el año de observación y la fecha de actualización de la fuente. Las series publicadas tienen cobertura nacional. Cada indicador conserva el enlace a su metodología original. Algunas observaciones son estimaciones según la metodología de su fuente.
 
 - [Población total](https://data.worldbank.org/indicator/SP.POP.TOTL?locations=CU), personas.
 - [Crecimiento de población](https://data.worldbank.org/indicator/SP.POP.GROW?locations=CU), porcentaje anual.
@@ -25,3 +25,10 @@ El manifiesto `public/data/sources.json` identifica la edición, los archivos ex
 ## Mapa base y superficie
 
 El mapa base claro es Positron de [OpenFreeMap](https://openfreemap.org/quick_start/), © OpenMapTiles y © colaboradores de OpenStreetMap. Si el proveedor no está disponible, se dibuja un contexto regional local de [Natural Earth](https://www.naturalearthdata.com/about/terms-of-use/), dominio público. Se puede reconstruir con `python3 scripts/ingest_context.py`. Las superficies en km² se calculan sobre los polígonos simplificados mediante una aproximación esférica. La leyenda muestra intervalos de superficie, no población ni cifras oficiales de extensión territorial.
+
+
+La edición incluye también series de economía y turismo, electricidad, salud, educación, uso de Internet, telefonía, medioambiente y transporte aéreo. Las fechas de referencia pueden diferir por serie. Acceso a electricidad mide cobertura poblacional y no mide cortes, disponibilidad horaria ni déficit actual.
+
+## Aeropuertos civiles
+
+[OurAirports Open Data](https://github.com/davidmegginson/ourairports-data), Unlicense. Se seleccionan aeropuertos medianos y grandes con IATA y servicio programado marcado en la edición descargada. Los puntos son instalaciones civiles públicas. La capa no representa vuelos en vivo ni confirma horarios actuales. Reproducible con `python3 scripts/ingest_airports.py`.

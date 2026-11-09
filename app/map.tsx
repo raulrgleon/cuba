@@ -1,12 +1,13 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import type {Map as MapLibre, StyleSpecification} from 'maplibre-gl';
-import {areaColor,areaPalette,bounds,displayName,extent,type Boundaries,type Boundary,type Level} from './data';
+import {areaColor,areaPalette,bounds,displayName,extent,type Airport,type Boundaries,type Boundary,type Level} from './data';
 
 type Props = {
   provinces:Boundaries; municipalities:Boundaries; levels:Record<Level,boolean>;
   selected:Boundary|null; onSelect:(feature:Boundary)=>void; reset:number;
   language:'es'|'en'; light:boolean; areas:boolean;
+  airports?:Airport[]; airport:Airport|null; onAirport:(airport:Airport)=>void;
 };
 
 function boundaryPath(feature:Boundary) {
@@ -39,7 +40,7 @@ export default function MapView(props:Props) {
   const [error,setError]=useState(false);
   const [basemap,setBasemap]=useState(false);
   const [coords,setCoords]=useState('22.00° N · 79.50° W');
-  const {provinces,municipalities,levels,selected,reset,language,light,areas}=props;
+  const {provinces,municipalities,levels,selected,reset,language,light,areas,airports,airport}=props;
 
   useEffect(()=>{
     let disposed=false;
@@ -139,6 +140,34 @@ export default function MapView(props:Props) {
     const padding=wide?{top:54,bottom:62,left:225,right:selected?310:76}:46;
     instance.fitBounds(selected?extent(selected):bounds,{padding,duration:window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:450,maxZoom:11});
   },[ready,selected,reset]);
+
+  useEffect(()=>{
+    const instance=map.current;
+    if(!ready||!instance||!airports?.length) return;
+    let disposed=false;
+    const markers:{remove:()=>unknown}[]=[];
+    import('maplibre-gl').then(({Marker})=>{
+      if(disposed) return;
+      for(const item of airports) {
+        const element=document.createElement('button');
+        element.type='button';
+        element.className='airport-marker';
+        element.textContent='✈';
+        element.title=item.iata+' · '+item.name;
+        element.setAttribute('aria-label',element.title);
+        element.onclick=event=>{event.stopPropagation();latest.current.onAirport(item);};
+        markers.push(new Marker({element}).setLngLat(item.coordinates).addTo(instance));
+      }
+    });
+    return ()=>{disposed=true;markers.forEach(marker=>marker.remove());};
+  },[ready,airports]);
+
+  useEffect(()=>{
+    if(!ready||!airport||!map.current) return;
+    map.current.easeTo({center:airport.coordinates,zoom:8,
+      offset:window.innerWidth>760?[-90,0]:[0,-60],
+      duration:window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:420});
+  },[ready,airport]);
 
   return <section className="map-zone" aria-label={language==='es'?'Mapa interactivo de Cuba':'Interactive map of Cuba'}>
     {!ready&&<SimpleMap {...props}/>}

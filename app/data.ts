@@ -4,7 +4,7 @@ export type Level = 'ADM1' | 'ADM2';
 export type Boundary = Feature<Polygon | MultiPolygon, {name:string; level:Level}> & {id:string};
 export type Boundaries = Omit<FeatureCollection<Polygon | MultiPolygon, Boundary['properties']>, 'features'> & {features:Boundary[]};
 export type Indicator = {
-  id:string; label:string; labelEn:string; unit:string; unitEn:string; source:string;
+  id:string; category:Theme; label:string; labelEn:string; unit:string; unitEn:string; source:string;
   url:string; license:string; updated:string; observations:{year:number; value:number}[];
 };
 export type Sources = {
@@ -86,3 +86,17 @@ export function areaColor(feature:Boundary) {
   const area=areaKm2(feature);
   return areaPalette[areaBreaks.filter(limit=>area>=limit).length];
 }
+
+export const themes={
+  people:{es:'Demografía',en:'Demographics',icon:'◉'},
+  economy:{es:'Economía y turismo',en:'Economy and tourism',icon:'◫'},
+  energy:{es:'Energía',en:'Energy',icon:'ϟ'},
+  transport:{es:'Transporte',en:'Transport',icon:'✈'},
+  health:{es:'Salud',en:'Health',icon:'✚'},
+  education:{es:'Educación',en:'Education',icon:'▤'},
+  connectivity:{es:'Conectividad',en:'Connectivity',icon:'◔'},
+  environment:{es:'Medioambiente',en:'Environment',icon:'◇'},
+} as const;
+export type Theme=keyof typeof themes;
+export type Airport={id:string;iata:string;name:string;town:string;coordinates:[number,number]};
+export type Airports={retrieved:string;source:string;license:string;airports:Airport[]};
