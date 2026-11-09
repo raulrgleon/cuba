@@ -32,3 +32,11 @@ La edición incluye también series de economía y turismo, electricidad, salud,
 ## Aeropuertos civiles
 
 [OurAirports Open Data](https://github.com/davidmegginson/ourairports-data), Unlicense. Se seleccionan aeropuertos medianos y grandes con IATA y servicio programado marcado en la edición descargada. Los puntos son instalaciones civiles públicas. La capa no representa vuelos en vivo ni confirma horarios actuales. Reproducible con `python3 scripts/ingest_airports.py`.
+
+## Población efectiva provincial
+
+ONEI, *Anuario Demográfico de Cuba 2024*, cuadro 1.2, p. 15. [Copia del informe](https://rotativo.com.mx/files/88746/00-anuario-demografico-2024.pdf#page=15). Se transcribieron cifras individuales de 2021–2024 y se vincularon por nombre a las unidades ADM1. Son población efectiva según la nota del cuadro. El agregado provincial de 2024 coincide con el total impreso. Se conservan las cifras publicadas de los años anteriores, cuya suma territorial difiere del total impreso por hasta seis personas. La metodología y el período difieren de la serie nacional del Banco Mundial. La app permite consultar ambas por separado.
+
+## Infraestructura civil y servicios públicos cartografiados
+
+[Geofabrik, extracto de Cuba](https://download.geofabrik.de/central-america/cuba.html), © colaboradores de OpenStreetMap, ODbL 1.0. Edición `cuba-261108.osm.pbf` del 8 de noviembre de 2026. Se seleccionaron elementos nombrados o referenciados por etiquetas públicas. Se excluyeron elementos etiquetados como privados, militares, abandonados o fuera de uso. Los polígonos de servicios se representan mediante un punto aproximado y las líneas son segmentos cartografiados. La cobertura es comunitaria y variable. Los puntos no acreditan horarios, disponibilidad de servicios ni estado operativo. Descarga de la edición derivada en `/data/places.geojson` bajo ODbL 1.0. Reproducible con `python3 -m pip install osmium==4.3.1` y `python3 scripts/ingest_osm.py ruta/al/extracto`.

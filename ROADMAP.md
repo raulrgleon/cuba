@@ -11,13 +11,15 @@
 
 ## Fase 2 · Datos territoriales
 
-- [ ] Confirmar licencia y equivalencias administrativas de series subnacionales antes de importarlas.
-- [ ] Añadir comparador territorial y exportaciones de tablas cuando haya series comparables.
+- [x] Incorporar población efectiva provincial con fuente y método separados de WDI.
+- [ ] Verificar y reconciliar series municipales.
+- [x] Comparador de cuatro provincias y exportación CSV para población efectiva.
 - [ ] Introducir revisión de datasets, control de acceso y auditoría de publicación.
 
 ## Fases 3 y 4 · Observatorios y herramientas GIS
 
 - [x] Series históricas de ocho temas y capa de aeropuertos civiles.
+- [x] Capas de transporte terrestre, salud, educación, mercados, parques y embalses a partir de OpenStreetMap.
 - [ ] Incorporar otras capas temáticas conforme se validen sus fuentes y licencias.
 - [ ] Incorporar páginas por territorio, cartografía temporal, mediciones y API con filtros.
 - [ ] Evaluar búsqueda semántica e IA opcional sobre observaciones citables.

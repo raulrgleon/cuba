@@ -100,3 +100,26 @@ export const themes={
 export type Theme=keyof typeof themes;
 export type Airport={id:string;iata:string;name:string;town:string;coordinates:[number,number]};
 export type Airports={retrieved:string;source:string;license:string;airports:Airport[]};
+
+export type ProvincialPopulation={source:string;url:string;years:number[];totals:number[];territories:Record<string,number[]>};
+export const populationBreaks=[400000,600000,800000,1000000];
+export const placeKinds={
+  road:{es:'Carreteras principales',en:'Major roads',color:'#d47832'},
+  rail:{es:'Ferrocarriles',en:'Railways',color:'#6950a1'},
+  station:{es:'Estaciones ferroviarias',en:'Railway stations',color:'#6950a1'},
+  port:{es:'Terminales de ferry',en:'Ferry terminals',color:'#027796'},
+  health:{es:'Hospitales y clínicas',en:'Hospitals and clinics',color:'#ba3f5d'},
+  pharmacy:{es:'Farmacias',en:'Pharmacies',color:'#147b74'},
+  school:{es:'Escuelas y centros docentes',en:'Schools and colleges',color:'#4073c0'},
+  university:{es:'Universidades',en:'Universities',color:'#3453a5'},
+  market:{es:'Mercados y supermercados',en:'Markets and supermarkets',color:'#976c16'},
+  park:{es:'Parques',en:'Parks',color:'#357c49'},
+  water:{es:'Embalses cartografiados',en:'Mapped reservoirs',color:'#178ca9'},
+} as const;
+export type PlaceKind=keyof typeof placeKinds;
+export type Place=Feature<import('geojson').Point|import('geojson').LineString,{name:string;kind:PlaceKind}> & {id:string};
+export type PlaceCollection={type:'FeatureCollection';features:Place[];metadata:{source:string;snapshot:string;license:string;counts:Partial<Record<PlaceKind,number>>}};
+
+export function populationColor(value:number) {
+  return areaPalette[populationBreaks.filter(limit=>value>=limit).length];
+}

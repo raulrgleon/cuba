@@ -48,3 +48,13 @@ class PublicSnapshots(unittest.TestCase):
         self.assertEqual(len({item["iata"] for item in airports}), len(airports))
         self.assertTrue(all(len(item["iata"]) == 3 and -86 < item["coordinates"][0] < -73
                             and 18 < item["coordinates"][1] < 25 for item in airports))
+
+    def test_provincial_population_and_open_map_layers(self):
+        population = json.loads((DATA / "population-provinces.json").read_text())
+        self.assertEqual(len(population["territories"]),16)
+        self.assertEqual(population["years"],[2021,2022,2023,2024])
+        self.assertEqual(sum(row[-1] for row in population["territories"].values()),population["totals"][-1])
+        places = json.loads((DATA / "places.geojson").read_text())
+        self.assertEqual(len({feature["id"] for feature in places["features"]}),len(places["features"]))
+        self.assertEqual(sum(places["metadata"]["counts"].values()),len(places["features"]))
+        self.assertGreaterEqual(len(places["metadata"]["counts"]),10)

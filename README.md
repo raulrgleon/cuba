@@ -1,6 +1,6 @@
 # CubaOS
 
-Explorador de Cuba con mapa vectorial, provincias, municipios y series nacionales en ocho áreas y una capa de aeropuertos civiles. Disponible en https://cuba.dnet.llc.
+Explorador de Cuba con mapa vectorial, provincias, municipios y series nacionales en ocho áreas, población efectiva provincial y capas civiles de transporte y servicios. Disponible en https://cuba.dnet.llc.
 
 ## Ejecutar
 
@@ -18,10 +18,10 @@ El servidor de desarrollo usa el puerto 3000. La compilación genera `out/`. El 
 
 ## Datos y mantenimiento
 
-El mapa usa una edición de límites administrativos de geoBoundaries. Las series nacionales proceden del Banco Mundial. La capa de aeropuertos procede de OurAirports. Los datos municipales y provinciales se limitan a geometrías. Actualiza las fuentes con `python3 scripts/ingest.py`, inspecciona el diff y ejecuta las pruebas antes de publicar. Cada edición contiene procedencia, años y hashes. Consulta [DATA_SOURCES.md](DATA_SOURCES.md) y [API.md](API.md).
+El mapa usa una edición de límites administrativos de geoBoundaries. Las series nacionales proceden del Banco Mundial. La capa de aeropuertos procede de OurAirports. Las provincias incluyen población efectiva ONEI para 2021–2024. Los municipios incluyen geometrías. Actualiza las fuentes con `python3 scripts/ingest.py`, inspecciona el diff y ejecuta las pruebas antes de publicar. Cada edición contiene procedencia, años y hashes. Consulta [DATA_SOURCES.md](DATA_SOURCES.md) y [API.md](API.md).
 
 ## Despliegue
 
 En DNET, el servicio de usuario `cubaos.service` sirve una compilación independiente en el puerto local 8873. Cloudflare Tunnel DNET-HOME publica solo el hostname de CubaOS. Para Coolify, sigue [DEPLOYMENT.md](DEPLOYMENT.md). No hay credenciales de aplicación ni dependencias de un servicio de IA.
 
-El diseño de la aplicación se describe en [ARCHITECTURE.md](ARCHITECTURE.md) y el alcance futuro en [ROADMAP.md](ROADMAP.md).
+El diseño de la aplicación se describe en [ARCHITECTURE.md](ARCHITECTURE.md) y el alcance futuro en [ROADMAP.md](ROADMAP.md). El [inventario de equivalencias](SPAINOS_PARITY.md) separa la cobertura actual y los módulos pendientes.
