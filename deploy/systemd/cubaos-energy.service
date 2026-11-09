@@ -1,0 +1,9 @@
+[Unit]
+Description=Refresh CubaOS electricity snapshots
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/.local/share/cubaos
+ExecStart=/usr/bin/python3 scripts/ingest_energy.py --output out/data/energy.json
+NoNewPrivileges=yes
+TimeoutStartSec=65s

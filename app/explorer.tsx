@@ -2,6 +2,7 @@
 
 import {useEffect,useMemo,useState} from 'react';
 import MapView from './map';
+import {Electricity,HumanRights,energyColor,type EnergyData} from './observatories';
 import {areaKm2,displayName,searchFeatures,normalize,themes,placeKinds,type Place,type PlaceKind,type PlaceCollection,type ProvincialPopulation,type Airport,type Airports,type Theme,type Boundaries,type Boundary,type Indicator,type Level,type Sources} from './data';
 
 type Dataset={provinces:Boundaries;municipalities:Boundaries;indicators:Indicator[];sources:Sources;airports:Airports|null};
@@ -50,6 +51,12 @@ export default function Explorer() {
   const [searchOpen,setSearchOpen]=useState(false);
   const [panel,setPanel]=useState<'sources'|'favorites'|null>(null);
   const [favorites,setFavorites]=useState<string[]>([]);
+  const [energyOpen,setEnergyOpen]=useState(false);
+  const [rightsOpen,setRightsOpen]=useState(false);
+  const [energy,setEnergy]=useState<EnergyData|null>(null);
+  const [energyDate,setEnergyDate]=useState('');
+  const [energyError,setEnergyError]=useState(false);
+  const [energyRetry,setEnergyRetry]=useState(0);
   const [theme,setTheme]=useState<Theme>('people');
   const [airportLayer,setAirportLayer]=useState(false);
   const [airport,setAirport]=useState<Airport|null>(null);
@@ -64,14 +71,18 @@ export default function Explorer() {
     Promise.all([
       getData<Boundaries>('adm1.geojson',controller.signal),
       getData<Boundaries>('adm2.geojson',controller.signal),
-      getData<Indicator[]>('indicators.json?edition=themes-v1',controller.signal),
-      getData<Sources>('sources.json?edition=themes-v1',controller.signal),
+      getData<Indicator[]>('indicators.json?edition=themes-v2',controller.signal),
+      getData<Sources>('sources.json?edition=themes-v2',controller.signal),
       getData<Airports>('airports.json',controller.signal).catch(()=>null),
       getData<ProvincialPopulation>('population-provinces.json',controller.signal).catch(()=>null),
     ]).then(([provinces,municipalities,indicators,sources,airports,provincialPopulation])=>{
       setPopulation(provincialPopulation);
       setData({provinces,municipalities,indicators,sources,airports});
       const view=new URLSearchParams(location.search);
+      const energyView=view.get('electricidad');
+      if(energyView&&/^\d{4}-\d{2}-\d{2}$/.test(energyView)){
+        setEnergyOpen(true);setEnergyDate(energyView);setShowInsights(true);
+      }
       const feature=[...provinces.features,...municipalities.features].find(item=>item.id===view.get('territorio'));
       if(feature) {
         setSelected(feature);
@@ -102,6 +113,23 @@ export default function Explorer() {
   useEffect(()=>{document.documentElement.lang=language;},[language]);
   useEffect(()=>{if(window.matchMedia('(max-width: 760px)').matches)setToolsOpen(false);},[]);
 
+  useEffect(()=>{
+    if(!energyOpen)return;
+    const controller=new AbortController();
+    async function refresh(){
+      try {
+        const response=await fetch('/data/energy.json',{signal:controller.signal,cache:'no-cache'});
+        if(!response.ok)throw new Error();
+        setEnergy(await response.json());setEnergyError(false);
+      } catch {
+        if(!controller.signal.aborted)setEnergyError(true);
+      }
+    }
+    void refresh();
+    const timer=setInterval(refresh,300_000);
+    return ()=>{controller.abort();clearInterval(timer);};
+  },[energyOpen,energyRetry]);
+
   const features=useMemo(()=>data?[...data.provinces.features,...data.municipalities.features]:[],[data]);
   const results=useMemo(()=>searchFeatures(features,query),[features,query]);
   const themed=data?.indicators.filter(item=>item.category===theme)??[];
@@ -110,6 +138,15 @@ export default function Explorer() {
     ?? (!year ? series?.observations.at(-1) : undefined);
   const points=series?chartPoints(series.observations):[];
   const displayedPoint=observation&&series?points[series.observations.indexOf(observation)]:null;
+  const provinceKey=(name:string)=>normalize(name).replace(/[^a-z0-9]+/g,'-');
+  const energyProvinces=data?.provinces.features.map(feature=>({
+    feature,name:displayName(feature),key:provinceKey(displayName(feature)),
+  }))??[];
+  const electricityDate=energyDate||[...Object.keys(energy?.provinces??{}),...(energy?.national.map(item=>item.date)??[])].sort().at(-1)||'';
+  const electricityRows=energy?.provinces[electricityDate];
+  const electricityColors=energyOpen&&energy?Object.fromEntries(energyProvinces.map(item=>[
+    item.feature.id,energyColor(electricityRows?.[item.key]),
+  ])):null;
   const selectedProvince=selected?.properties.level==='ADM1'?displayName(selected):null;
   const populationIndex=population?.years.indexOf(populationYear)??-1;
   const provincePopulation=selectedProvince?population?.territories[selectedProvince]?.[populationIndex]:undefined;
@@ -145,6 +182,7 @@ export default function Explorer() {
     const url=new URL(location.pathname,location.origin);
     if(selected) url.searchParams.set('territorio',selected.id);
     if(airport) url.searchParams.set('aeropuerto',airport.id);
+    if(energyOpen&&electricityDate) url.searchParams.set('electricidad',electricityDate);
     if(populationVisible) url.searchParams.set('poblacion',String(populationYear));
     if(year) url.searchParams.set('anio',year);
     url.searchParams.set('indicador',indicatorId);
@@ -152,12 +190,12 @@ export default function Explorer() {
     catch {setNotice(t.copyError);}
   }
 
-  function resetMap() {setSelected(null);setAirport(null);setPlace(null);setShowInsights(false);setReset(current=>current+1);}
+  function resetMap() {setEnergyOpen(false);setSelected(null);setAirport(null);setPlace(null);setShowInsights(false);setReset(current=>current+1);}
 
   function chooseTheme(next:Theme) {
     const nextIndicator=data?.indicators.find(item=>item.category===next);
     if(!nextIndicator)return;
-    setTheme(next);setIndicatorId(nextIndicator.id);setYear('');setShowInsights(true);
+    setEnergyOpen(false);setTheme(next);setIndicatorId(nextIndicator.id);setYear('');setShowInsights(true);
     if(next==='transport'){
       setAirportLayer(true);
       if(theme!=='transport'){setSelected(null);setReset(current=>current+1);}
@@ -188,7 +226,7 @@ export default function Explorer() {
   }
 
   function choosePlace(next:Place) {
-    setPlace(next);setAirport(null);setSelected(null);setQuery('');setSearchOpen(false);setShowInsights(true);
+    setEnergyOpen(false);setPlace(next);setAirport(null);setSelected(null);setQuery('');setSearchOpen(false);setShowInsights(true);
   }
 
   function pickIndicator(item:Indicator) {
@@ -245,10 +283,18 @@ export default function Explorer() {
         <button aria-label={language==='es'?'Switch to English':'Cambiar a español'} onClick={()=>{const next=language==='es'?'en':'es';setLanguage(next);remember('cubaos-language',next);}}>{language==='es'?'EN':'ES'}</button>
       </nav>
     </header>
+    <nav className="observatory-nav" aria-label={language==='es'?'Observatorios':'Observatories'}>
+      <button className={energyOpen?'active':''} aria-pressed={energyOpen} onClick={()=>{
+        const open=!energyOpen||!showInsights;
+        setEnergyOpen(open);setRightsOpen(false);setShowInsights(open);
+        if(!energyOpen)setLevels(current=>({...current,ADM1:true}));
+      }}>ϟ {language==='es'?'Observatorio eléctrico':'Electricity observatory'}</button>
+      <button className={rightsOpen?'active':''} aria-pressed={rightsOpen} onClick={()=>setRightsOpen(!rightsOpen)}>◎ {language==='es'?'Derechos humanos':'Human rights'}</button>
+    </nav>
     <div className="stat-strip" aria-label={language==='es'?'Indicadores nacionales':'National indicators'}>
       {themed.slice(0,3).map(item=>{
         const latest=item.observations.at(-1);
-        return <button key={item.id} onClick={()=>{setIndicatorId(item.id);setYear('');setShowInsights(true);}}>
+        return <button key={item.id} onClick={()=>{setEnergyOpen(false);setIndicatorId(item.id);setYear('');setShowInsights(true);}}>
           <span>{language==='es'?item.label:item.labelEn}</span>
           <strong>{latest&&new Intl.NumberFormat(language,{maximumFractionDigits:2}).format(latest.value)} {(language==='es'?item.unit:item.unitEn).startsWith('%')?'%':''}</strong>
           <small>{latest?.year} · WDI</small>
@@ -306,9 +352,17 @@ export default function Explorer() {
         <button className="secondary" onClick={resetMap}>⟲ {t.reset}</button>
         <div className="source-note"><span className="eyebrow">{t.boundary}</span><p>{t.note}</p></div>
       </aside>
-      {data?<MapView key={mapStyle} mapStyle={mapStyle} provinces={data.provinces} municipalities={data.municipalities} levels={levels} selected={selected} reset={reset} onSelect={pick} language={language} light={light} areas={areas} airports={airportLayer?data.airports?.airports:undefined} airport={airport} onAirport={chooseAirport} population={population} populationYear={populationYear} populationVisible={populationVisible&&!!population} place={place} places={places} placeLayers={placeLayers} onPlace={choosePlace}/>
+      {data?<MapView key={mapStyle} mapStyle={mapStyle} provinces={data.provinces} municipalities={data.municipalities} levels={levels} selected={selected} reset={reset} onSelect={pick} language={language} light={light} areas={areas} airports={airportLayer?data.airports?.airports:undefined} airport={airport} onAirport={chooseAirport} population={population} populationYear={populationYear} populationVisible={populationVisible&&!!population} place={place} places={places} placeLayers={placeLayers} onPlace={choosePlace} electricityColors={electricityColors} electricityDate={electricityDate}/>
         :<section className="map-zone map-placeholder">{loadError?<div><p>{t.fail}</p><button onClick={()=>{setLoadError(false);setAttempt(attempt+1);}}>{t.retry}</button></div>:t.load}</section>}
-      <aside className={showInsights?'insights':'insights insights-closed'}>
+      {energyOpen&&showInsights&&<aside className="insights energy-insights" aria-label={language==='es'?'Observatorio eléctrico':'Electricity observatory'}>
+        <button className="insights-close" onClick={()=>setShowInsights(false)} aria-label={t.close}>×</button>
+        <p className="eyebrow"><i/>{language==='es'?'PARTES ELÉCTRICOS':'POWER REPORTS'}</p>
+        <h2>{language==='es'?'Dónde se reportan cortes':'Where outages are reported'}</h2>
+        <Electricity data={energy} date={electricityDate} onDate={setEnergyDate} province={selectedProvince?provinceKey(selectedProvince):''}
+          provinces={energyProvinces} onProvince={key=>{const match=energyProvinces.find(item=>item.key===key);if(match)pick(match.feature);else setSelected(null);}}
+          language={language} failed={energyError} onRetry={()=>setEnergyRetry(current=>current+1)}/>
+      </aside>}
+      <aside className={showInsights&&!energyOpen?'insights':'insights insights-closed'}>
         <button className="insights-close" onClick={()=>setShowInsights(false)} aria-label={t.close}>×</button>
         <p className="eyebrow"><i/>{place?placeKinds[place.properties.kind][language]:airport?(language==='es'?'Aeropuerto civil':'Civil airport'):selected?t.territory:t.overview}</p>
         <h2>{place?place.properties.name:airport?airport.name:selected?displayName(selected):t.national}</h2>
@@ -320,6 +374,8 @@ export default function Explorer() {
           <div><button onClick={()=>toggleCompare(selectedProvince)} disabled={compare.length>=4&&!compare.includes(selectedProvince)}>{compare.includes(selectedProvince)?(language==='es'?'Quitar de comparación':'Remove from comparison'):(language==='es'?'Comparar provincia':'Compare province')}</button></div></div>}
         {selected&&provincePopulation===undefined&&<p className="muted">{t.noLocal}</p>}
         <div className="divider"/>
+        <h3>{language==='es'?'Indicadores de toda Cuba':'Indicators for all of Cuba'}</h3>
+        {selected&&<p className="muted">{language==='es'?'Los datos de abajo corresponden al país completo.':'The data below covers the entire country.'}</p>}
         {theme==='energy'&&<p className="muted">{language==='es'?'Series históricas nacionales. La cobertura eléctrica no mide apagones ni disponibilidad en tiempo real.':'National historical series. Electricity access does not measure outages or real-time availability.'}</p>}
         {series&&<section className="indicator">
           <div className="field"><label htmlFor="theme">{language==='es'?'Tema':'Topic'}</label>
@@ -337,7 +393,7 @@ export default function Explorer() {
             {[...series.observations].reverse().map(row=><option key={row.year}>{row.year}</option>)}
           </select></div>
           <div className="metric">
-            <p className="eyebrow">{language==='es'?'Serie nacional':'National series'}{observation?' · '+observation.year:''}</p>
+            <p className="eyebrow">{language==='es'?'Toda Cuba':'All of Cuba'}{observation?' · '+observation.year:''}</p>
             <strong>{observation?new Intl.NumberFormat(language,{maximumFractionDigits:2}).format(observation.value):'—'}</strong>
             <span>{observation?(language==='es'?series.unit:series.unitEn):t.noData}</span>
           </div>
@@ -370,6 +426,10 @@ export default function Explorer() {
       <button className="mobile-data" onClick={()=>setShowInsights(!showInsights)} aria-expanded={showInsights}>{language==='es'?'Temas y datos':'Topics and data'}</button>
     </main>
     <footer className="footer"><span>© OpenStreetMap contributors · geoBoundaries · ODbL 1.0</span><span>{data&&`${t.received} · ${data.sources.retrieved}`}</span></footer>
+    {rightsOpen&&<section className="drawer rights-drawer" aria-label={language==='es'?'Derechos humanos':'Human rights'}>
+      <div className="drawer-title"><h2>{language==='es'?'Derechos humanos':'Human rights'}</h2><button onClick={()=>setRightsOpen(false)}>{t.close}</button></div>
+      <HumanRights language={language}/>
+    </section>}
     {panel&&<section className="drawer" aria-label={panel==='sources'?t.catalog:t.favorite} onKeyDown={event=>{if(event.key==='Escape')setPanel(null);}}>
       <div className="drawer-title"><h2>{panel==='sources'?t.catalog:t.favorite}</h2><button onClick={()=>setPanel(null)}>{t.close}</button></div>
       {panel==='sources'?<>

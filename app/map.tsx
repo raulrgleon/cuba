@@ -1,6 +1,7 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import type {Map as MapLibre, StyleSpecification} from 'maplibre-gl';
+import {energyLegend} from './observatories';
 import {areaColor,areaPalette,bounds,populationColor,placeKinds,displayName,extent,type Airport,type Place,type PlaceKind,type PlaceCollection,type ProvincialPopulation,type Boundaries,type Boundary,type Level} from './data';
 
 type Props = {
@@ -8,6 +9,7 @@ type Props = {
   provinces:Boundaries; municipalities:Boundaries; levels:Record<Level,boolean>;
   selected:Boundary|null; onSelect:(feature:Boundary)=>void; reset:number;
   language:'es'|'en'; light:boolean; areas:boolean;
+  electricityColors:Record<string,string>|null; electricityDate:string;
   population:ProvincialPopulation|null; populationYear:number; populationVisible:boolean;
   place:Place|null; places:PlaceCollection|null; placeLayers:PlaceKind[]; onPlace:(place:Place)=>void;
   airports?:Airport[]; airport:Airport|null; onAirport:(airport:Airport)=>void;
@@ -19,7 +21,7 @@ function boundaryPath(feature:Boundary) {
     `${index?'L':'M'}${(x*100).toFixed(2)} ${(-y*100).toFixed(2)}`).join('')+'Z')).join('');
 }
 
-function SimpleMap({provinces,municipalities,levels,selected,onSelect,areas,population,populationYear,populationVisible}:Props) {
+function SimpleMap({provinces,municipalities,levels,selected,onSelect,areas,population,populationYear,populationVisible,electricityColors}:Props) {
   const paths=useMemo(()=>[...provinces.features,...municipalities.features].map(feature=>({
     feature,path:boundaryPath(feature),
   })),[provinces,municipalities]);
@@ -28,9 +30,9 @@ function SimpleMap({provinces,municipalities,levels,selected,onSelect,areas,popu
   return <svg className="map-overview" viewBox={`${(west-pad)*100} ${-(north+pad)*100} ${(east-west+2*pad)*100} ${(north-south+2*pad)*100}`} aria-label="Cuba">
     {paths.filter(({feature})=>levels[feature.properties.level]).map(({feature,path})=>
       <path key={feature.id} d={path} className={`boundary ${feature.properties.level}${feature.id===selected?.id?' selected':''}`}
-        style={feature.properties.level==='ADM1'&&(areas||populationVisible)?{fill:populationVisible&&population
+        style={feature.properties.level==='ADM1'&&(areas||populationVisible||electricityColors)?{fill:electricityColors?.[feature.id]??(populationVisible&&population
           ? populationColor(population.territories[displayName(feature)]?.[population.years.indexOf(populationYear)]??0)
-          : areaColor(feature)}:undefined} vectorEffect="non-scaling-stroke" fillRule="evenodd" onClick={()=>onSelect(feature)}>
+          : areaColor(feature))}:undefined} vectorEffect="non-scaling-stroke" fillRule="evenodd" onClick={()=>onSelect(feature)}>
         <title>{displayName(feature)}</title>
       </path>)}
   </svg>;
@@ -48,7 +50,7 @@ export default function MapView(props:Props) {
   const [measurePoints,setMeasurePoints]=useState<[number,number][]>([]);
   const measureMode=useRef(false);
   const [coords,setCoords]=useState('22.00° N · 79.50° W');
-  const {provinces,municipalities,levels,selected,reset,language,light,areas,airports,airport,population,populationYear,populationVisible,place,places,placeLayers}=props;
+  const {provinces,municipalities,levels,selected,reset,language,light,areas,airports,airport,population,populationYear,populationVisible,place,places,placeLayers,electricityColors,electricityDate}=props;
 
   useEffect(()=>{
     let disposed=false;
@@ -150,7 +152,11 @@ export default function MapView(props:Props) {
       instance.setPaintProperty('sea','background-color',light?'#d7e2e5':'#142632');
       instance.setPaintProperty('regional-land','fill-color',light?'#f2f2eb':'#293b42');
     }
-    if(populationVisible&&population){
+    if(electricityColors){
+      const expression:import('maplibre-gl').ExpressionSpecification=['match',['get','boundaryId'],'','#88969f',
+        ...Object.entries(electricityColors).flat(),'#88969f'];
+      instance.setPaintProperty('province-fill','fill-color',expression);
+    }else if(populationVisible&&population){
       const yearIndex=population.years.indexOf(populationYear);
       const expression:import('maplibre-gl').ExpressionSpecification=['match',['get','boundaryId'],'','#a6adb2',
         ...provinces.features.flatMap(feature=>{
@@ -161,7 +167,7 @@ export default function MapView(props:Props) {
     } else {
       instance.setPaintProperty('province-fill','fill-color',areas?['get','areaColor']:'#86add1');
     }
-  },[ready,levels,light,areas,population,populationVisible,populationYear,provinces]);
+  },[ready,levels,light,areas,population,populationVisible,populationYear,provinces,electricityColors]);
 
   useEffect(()=>{
     const instance=map.current;
@@ -271,7 +277,11 @@ export default function MapView(props:Props) {
       {measurePoints.length>0&&<button onClick={()=>setMeasurePoints([])}>{language==='es'?'Limpiar':'Clear'}</button>}
     </div>}
     <span className="map-coordinates">{coords}</span>
-    {(areas||populationVisible)&&levels.ADM1&&<div className="map-legend">
+    {electricityColors&&<div className="map-legend energy-legend">
+      <strong>{language==='es'?'Partes eléctricos':'Power reports'} · {electricityDate}</strong>
+      {energyLegend.map(item=><span key={item.color}><i style={{background:item.color}}/>{item[language]}</span>)}
+    </div>}
+    {!electricityColors&&(areas||populationVisible)&&levels.ADM1&&<div className="map-legend">
       <strong>{populationVisible?(language==='es'?'Población efectiva':'Effective population')+' · '+populationYear
         :(language==='es'?'Superficie aproximada':'Approximate area')+' · km²'}</strong>
       <div className="legend-colors">{areaPalette.map(color=><i key={color} style={{background:color}}/>)}</div>

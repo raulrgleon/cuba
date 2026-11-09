@@ -9,6 +9,7 @@ Recursos de solo lectura, con HTTP GET y HEAD.
 | `/data/indicators.json` | JSON | Series WDI nacionales por tema |
 | `/data/population-provinces.json` | JSON | Población efectiva provincial ONEI, 2021–2024 |
 | `/data/places.geojson` | GeoJSON | Infraestructura y servicios civiles cartografiados |
+| `/data/energy.json` | JSON | Partes eléctricos del SEN y avisos provinciales fechados |
 | `/data/airports.json` | JSON | Aeropuertos civiles de servicio regular según OurAirports |
 | `/data/sources.json` | JSON | Procedencia, fecha de consulta y hashes |
 

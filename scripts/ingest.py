@@ -34,6 +34,18 @@ WDI = {
     "AG.LND.FRST.ZS": ("environment", "Superficie forestal", "Forest area", "% de la superficie terrestre", "% of land area"),
     "EN.GHG.CO2.PC.CE.AR5": ("environment", "Emisiones de CO₂ por persona", "CO₂ emissions per capita", "t de CO₂e por persona", "t CO₂e per person"),
     "IS.AIR.PSGR": ("transport", "Pasajeros de aerolíneas registradas en Cuba", "Passengers carried by Cuba-registered airlines", "pasajeros", "passengers"),
+    "SP.DYN.TFRT.IN": ("people", "Fecundidad", "Fertility rate", "hijos por mujer", "births per woman"),
+    "SP.DYN.CBRT.IN": ("people", "Natalidad", "Birth rate", "por 1.000 personas", "per 1,000 people"),
+    "SP.DYN.CDRT.IN": ("people", "Mortalidad general", "Death rate", "por 1.000 personas", "per 1,000 people"),
+    "NY.GDP.PCAP.CD": ("economy", "PIB por persona", "GDP per capita", "USD corrientes", "current USD"),
+    "NE.EXP.GNFS.ZS": ("economy", "Exportaciones de bienes y servicios", "Exports of goods and services", "% del PIB", "% of GDP"),
+    "NE.IMP.GNFS.ZS": ("economy", "Importaciones de bienes y servicios", "Imports of goods and services", "% del PIB", "% of GDP"),
+    "AG.LND.AGRI.ZS": ("environment", "Superficie agrícola", "Agricultural land", "% de la superficie terrestre", "% of land area"),
+    "ER.H2O.FWTL.ZS": ("environment", "Extracción de agua dulce", "Freshwater withdrawals", "% de recursos internos", "% of internal resources"),
+    "SH.STA.SMSS.ZS": ("health", "Saneamiento gestionado de forma segura", "Safely managed sanitation", "% de la población", "% of population"),
+    "SH.IMM.MEAS": ("health", "Vacunación contra el sarampión", "Measles vaccination", "% de niños de 12 a 23 meses", "% of children ages 12–23 months"),
+    "SE.ADT.LITR.ZS": ("education", "Alfabetización de adultos", "Adult literacy", "% de población de 15 años o más", "% of people age 15+"),
+    "IT.NET.BBND.P2": ("connectivity", "Banda ancha fija", "Fixed broadband subscriptions", "por 100 personas", "per 100 people"),
 }
 
 

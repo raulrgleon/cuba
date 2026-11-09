@@ -7,3 +7,7 @@ Crea una aplicación nueva desde este repositorio usando **Dockerfile**, puerto 
 ## DNET
 
 El servicio aislado usa `python3 scripts/serve.py --directory out` en loopback. Cada versión se puede conservar en un directorio aparte para revertir. La ruta directa del túnel es `http://127.0.0.1:8873`. Los cambios de Cloudflare deben conservar las demás reglas y añadir la ruta nueva antes de la regla final. Verifica DNS, HTTPS y la salud de una ruta existente.
+
+## Actualización eléctrica
+
+En DNET, copia `scripts/ingest_energy.py` al directorio de despliegue y las unidades `deploy/systemd/cubaos-energy.*` al directorio de unidades del usuario. Ejecuta `systemctl --user daemon-reload`, `systemctl --user start cubaos-energy.service` y `systemctl --user enable --now cubaos-energy.timer`. El importador solo publica al terminar correctamente y conserva el archivo anterior ante un error.

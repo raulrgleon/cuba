@@ -1,0 +1,10 @@
+[Unit]
+Description=Fetch CubaOS electricity reports twice per hour
+
+[Timer]
+OnCalendar=*-*-* *:00,30:00
+Persistent=true
+Unit=cubaos-energy.service
+
+[Install]
+WantedBy=timers.target

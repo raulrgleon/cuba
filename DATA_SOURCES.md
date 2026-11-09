@@ -40,3 +40,11 @@ ONEI, *Anuario Demográfico de Cuba 2024*, cuadro 1.2, p. 15. [Copia del informe
 ## Infraestructura civil y servicios públicos cartografiados
 
 [Geofabrik, extracto de Cuba](https://download.geofabrik.de/central-america/cuba.html), © colaboradores de OpenStreetMap, ODbL 1.0. Edición `cuba-261108.osm.pbf` del 8 de noviembre de 2026. Se seleccionaron elementos nombrados o referenciados por etiquetas públicas. Se excluyeron elementos etiquetados como privados, militares, abandonados o fuera de uso. Los polígonos de servicios se representan mediante un punto aproximado y las líneas son segmentos cartografiados. La cobertura es comunitaria y variable. Los puntos no acreditan horarios, disponibilidad de servicios ni estado operativo. Descarga de la edición derivada en `/data/places.geojson` bajo ODbL 1.0. Reproducible con `python3 -m pip install osmium==4.3.1` y `python3 scripts/ingest_osm.py ruta/al/extracto`.
+
+## Observatorio eléctrico
+
+[El Alambique](https://elalambique.net/datos/), CC BY 4.0, a partir de los partes de la UNE y las publicaciones de las empresas eléctricas provinciales. Se importan 90 partes nacionales y 45 días de partes provinciales. Las mediciones de la mañana, las previsiones de hora pico y el máximo del día anterior se presentan por separado. El color provincial representa lo reportado para la fecha seleccionada, según los campos publicados. Ni una cifra agregada ni la ausencia de avisos confirma si un domicilio tiene suministro. Los MW provinciales no se suman ni comparan entre provincias. El sistema consulta la fuente cada 30 minutos; mantiene la edición anterior si falla la descarga o llega una edición más antigua.
+
+## Derechos humanos
+
+La sección cita los informes de [ONU](https://www.ohchr.org/en/hr-bodies/upr/cu-index) y [CIDH](https://oas.org/en/iachr/reports/ia.asp?Year=2025), y cifras atribuidas a las ediciones 2026 de [Freedom House](https://freedomhouse.org/country/cuba/freedom-world/2026) y [RSF](https://rsf.org/en/country/cuba). Son fuentes e índices distintos. CubaOS no los combina en una puntuación propia ni publica registros personales.

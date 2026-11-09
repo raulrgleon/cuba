@@ -58,3 +58,13 @@ class PublicSnapshots(unittest.TestCase):
         self.assertEqual(len({feature["id"] for feature in places["features"]}),len(places["features"]))
         self.assertEqual(sum(places["metadata"]["counts"].values()),len(places["features"]))
         self.assertGreaterEqual(len(places["metadata"]["counts"]),10)
+
+    def test_electricity_edition_has_attribution_and_unknowns(self):
+        edition = json.loads((DATA / "energy.json").read_text())
+        self.assertEqual(edition["license"],"CC BY 4.0")
+        self.assertEqual(len(edition["national"]),90)
+        self.assertGreaterEqual(len(edition["provinces"]),30)
+        latest = max(edition["provinces"])
+        self.assertNotIn("pinar-del-rio",edition["provinces"][latest])
+        self.assertTrue(any(item["latest_served_mw"] is None
+                            for item in edition["provinces"][latest].values()))
