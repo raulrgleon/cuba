@@ -24,6 +24,10 @@ CUBAVERSO = "https://cubaverso.com/apagones-cuba-hoy"
 VILLA = "electrico1895"
 TELEGRAM = "https://t.me/s/"
 CODE = r"[A-Z]{1,4}\d{1,5}"
+ZONES = "https://cubaaltanto.org/mi-zona/zonas-"
+PROVINCES = ("Pinar del Río", "Artemisa", "La Habana", "Mayabeque", "Matanzas",
+             "Cienfuegos", "Villa Clara", "Sancti Spíritus", "Ciego de Ávila",
+             "Camagüey", "Las Tunas", "Holguín", "Granma", "Santiago de Cuba", "Guantánamo")
 
 
 def normalized(value):
@@ -46,11 +50,15 @@ def get(url):
         return response.read(8_000_000).decode("utf-8")
 
 
-def event(province, municipality, circuit, state, stamp, source, url):
+def municipality_name(province, municipality):
     if province == "La Habana":
         municipality = {"10 de octubre": "Diez de Octubre", "plaza": "Plaza de la Revolución",
                         "habana vieja": "La Habana Vieja"}.get(normalized(municipality), municipality)
-    return dict(province=province, municipality=municipality, circuit=circuit,
+    return municipality
+
+
+def event(province, municipality, circuit, state, stamp, source, url):
+    return dict(province=province, municipality=municipality_name(province, municipality), circuit=circuit,
                 state=state, at=time(stamp).isoformat(), source=source, url=url)
 
 
@@ -59,7 +67,7 @@ def catalog(body):
     for item in json.loads(body)["circuitos"]:
         code = item.get("codigo", "")
         municipality = item.get("municipio")
-        if not municipality or not re.fullmatch(CODE, code):
+        if not re.fullmatch(CODE, code):
             continue
         municipalities = item.get("municipios") or [municipality]
         places[code] = [name for name in municipalities if isinstance(name, str) and name.strip()]
@@ -71,6 +79,98 @@ def catalog(body):
                 rows.append(event("La Habana", name, code, state, item["estado_fecha"],
                                   "Apagones La Habana", f"https://apagoneshabana.lat/circuitos?c={code}"))
     return places, rows
+
+
+def circuit_key(province, municipalities, circuit):
+    code = normalized(circuit)
+    if re.fullmatch(r"[a-z]{0,5}[ -]*\d{1,6}[a-z]?", code):
+        code = re.sub(r"[ -]", "", code)
+    scope = "" if province == "La Habana" else normalized(municipalities[0] if municipalities else "")
+    return f"{normalized(province)}:{scope}:{code}"
+
+
+def directory_entry(province, municipalities, circuit, source, url, name=None):
+    municipalities = sorted({municipality_name(province, value.strip()) for value in municipalities
+                             if isinstance(value, str) and value.strip()
+                             and normalized(value) not in ("sin municipio confirmado", "municipio por confirmar")})
+    return dict(id=circuit_key(province, municipalities, circuit), province=province,
+                municipalities=municipalities, circuit=circuit, name=name or circuit,
+                source=source, url=url)
+
+
+def provincial_directory(province, body, now):
+    match = re.fullmatch(r"\s*window\.MAPA_ZONAS\s*=\s*(.*?);?\s*", body, re.S)
+    if not match:
+        raise ValueError("Missing provincial circuit directory")
+    data = json.loads(match[1])
+    if data["prov"] != province or not data["c"]:
+        raise ValueError("Unexpected or empty provincial circuit directory")
+    entries = []
+    for row in data["c"]:
+        item = dict(zip(data["cols"], row))
+        key, name = item.get("key"), item.get("name")
+        if not isinstance(key, str) or not isinstance(name, str) or not key.strip() or not name.strip():
+            continue
+        explicit = re.match(r"^Circuito\s+(.+?)(?:\s+·\s+|$)", name, re.I)
+        code = explicit[1].strip() if explicit else name.strip()
+        if province == "La Habana" and re.fullmatch(CODE, key.upper()):
+            code = key.upper()
+        places = [item.get("muni")]
+        places.extend(record[0] for record in (item.get("mm") or [])
+                      if isinstance(record, list) and record)
+        entry = directory_entry(province, places, code, "Cuba al Tanto", "https://cubaaltanto.org/", name)
+        # These rows summarize past notices. They never activate a current map marker.
+        if item.get("ls") in ("on", "off") and item.get("lt"):
+            at = time(item["lt"])
+            if at <= now + timedelta(minutes=2):
+                entry["lastNotice"] = dict(state=item["ls"], at=at.isoformat(), sources={entry["source"]: entry["url"]})
+        entries.append(entry)
+    return entries
+
+
+def update_directory(previous, places, rows, now):
+    entries = {entry["id"]: entry for entry in previous.get("circuitDirectory", [])}
+    checked = dict(previous.get("directoryChecked", {}))
+
+    def merge(entry):
+        existing = entries.get(entry["id"], {})
+        result = {**existing, **entry}
+        result["municipalities"] = sorted(set(existing.get("municipalities", []) + entry["municipalities"]))
+        notices = [notice for notice in (existing.get("lastNotice"), entry.get("lastNotice")) if notice]
+        if notices:
+            result["lastNotice"] = max(notices, key=lambda notice: notice["at"])
+        entries[entry["id"]] = result
+
+    due = [province for province in PROVINCES
+           if province not in checked or now - time(checked[province]) >= timedelta(hours=6)]
+    if due:
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            jobs = []
+            for province in due:
+                url = ZONES + normalized(province).replace(" ", "-") + ".js"
+                jobs.append((province, pool.submit(get, url)))
+            for province, future in jobs:
+                try:
+                    for entry in provincial_directory(province, future.result(), now):
+                        merge(entry)
+                    checked[province] = now.isoformat()
+                except (OSError, ValueError, KeyError, TypeError) as error:
+                    print(f"Catálogo {province}: {error}", flush=True)
+                    checked[province] = (now - timedelta(hours=5)).isoformat()
+    for code, municipalities in places.items():
+        entry = directory_entry("La Habana", municipalities, code, "Apagones La Habana",
+                                f"https://apagoneshabana.lat/circuitos?c={code}")
+        if entry["id"] in entries:
+            entry["name"] = entries[entry["id"]]["name"]
+        merge(entry)
+    for row in rows:
+        entry = directory_entry(row["province"], [row["municipality"]], row["circuit"], row["source"], row["url"])
+        existing = entries.get(entry["id"])
+        if existing:
+            entry = {**existing, "municipalities": existing["municipalities"] + entry["municipalities"]}
+        entry["lastNotice"] = {key: row[key] for key in ("state", "at", "sources")}
+        merge(entry)
+    return sorted(entries.values(), key=lambda entry: (entry["province"], entry["name"])), checked
 
 
 def havana_event(places, code, state, stamp, source, url):
@@ -170,6 +270,13 @@ def cubaverso(body, places):
 def utility_message(message, channel, places, stamp, url, source):
     header, _, details = message.strip().partition("\n")
     title = normalized(header)
+    if channel == VILLA:
+        partial = re.search(r"\bafectad[oa] de forma parcial,?\s+(?:el\s+)?circuito\s+(\d{1,5}[A-Z]?)"
+                            r"[^\n,]*?\s+del municipio\s+([^,.\n]+)", header, re.I)
+        if partial:
+            return [event("Villa Clara", partial[2].strip(), partial[1].upper(), "partial", stamp, source, url)]
+    if "parcial" in title:
+        return []
     on = re.search(r"\b(?:restablecid[oa]|restablece|queda con servicio)\b", title)
     off = re.search(r"\b(?:afectad[oa]|se afecto|queda afectado|fuera de servicio)\b", title)
     if bool(on) == bool(off) or "servicio electrico" not in title:
@@ -209,7 +316,7 @@ def reconcile(rows, now):
         age = now - time(row["at"])
         if not timedelta(minutes=-2) <= age <= timedelta(hours=WINDOW_HOURS):
             continue
-        key = (normalized(row["province"]), normalized(row["municipality"]), row["circuit"])
+        key = (normalized(row["municipality"]), circuit_key(row["province"], [row["municipality"]], row["circuit"]))
         grouped.setdefault(key, []).append(row)
     result = []
     for observations in grouped.values():
@@ -283,7 +390,8 @@ def main():
               if -timedelta(minutes=2) <= now - time(row["at"]) <= timedelta(hours=WINDOW_HOURS)}
     observations = list(unique.values())
     reports = reconcile(observations, now)
-    payload = dict(checked=now.isoformat(), windowHours=WINDOW_HOURS, sources=health,
+    directory, directory_checked = update_directory(previous, places, list(reversed(reports)), now)
+    payload = dict(circuitDirectory=directory, directoryChecked=directory_checked, checked=now.isoformat(), windowHours=WINDOW_HOURS, sources=health,
                    reports=reports, catalog=places, observations=observations)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with NamedTemporaryFile(mode="w", encoding="utf-8", dir=args.output.parent, delete=False) as file:
@@ -294,7 +402,7 @@ def main():
         temp.replace(args.output)
     finally:
         temp.unlink(missing_ok=True)
-    print(f"{len(reports)} recent circuit notices; {health}", flush=True)
+    print(f"{len(directory)} catalog entries; {len(reports)} recent circuit notices; {health}", flush=True)
 
 
 if __name__ == "__main__":

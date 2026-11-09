@@ -26,7 +26,10 @@ test('energy map distinguishes outages, restorations and expired notices',async(
   const sources={'Empresa Eléctrica de La Habana':'https://t.me/EmpresaElectricaDeLaHabana/1'};
   const fixture=(circuit:string,state:'on'|'off',at:string)=>({province:'La Habana',municipality:'Marianao',circuit,state,at,sources});
   await page.route('**/data/power-live.json?*',route=>route.fulfill({json:{checked,windowHours:6,sources:[],
-    reports:[fixture('A490','on',checked),fixture('S514','off',checked),fixture('OLD','off',stale)]}}));
+    reports:[fixture('A490','on',checked),fixture('S514','off',checked),fixture('OLD','off',stale)],
+    circuitDirectory:[{id:'la habana::a9999',province:'La Habana',municipalities:['Marianao'],
+      circuit:'A9999',name:'Circuito A9999',source:'Apagones La Habana',url:'https://apagoneshabana.lat/',
+      lastNotice:{state:'off',at:stale,sources}}]}}));
   await page.goto('/');
   await page.getByRole('button',{name:'Energía',exact:true}).click();
   await expect(page.locator('.map-power-bulb.on')).toHaveCSS('animation-name','power-glow');
@@ -40,4 +43,7 @@ test('energy map distinguishes outages, restorations and expired notices',async(
   await expect(page.locator('.power-list')).not.toContainText('OLD');
   await page.getByRole('textbox',{name:'Buscar circuito o municipio'}).fill('S514');
   await expect(page.locator('.power-list li')).toHaveCount(1);
+  await page.getByRole('textbox',{name:'Buscar circuito o municipio'}).fill('A9999');
+  await expect(page.locator('.power-list li')).toContainText('Sin confirmación reciente');
+  await expect(page.locator('.power-list li')).toContainText('Último aviso registrado');
 });

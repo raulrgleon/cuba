@@ -74,3 +74,7 @@ a{color:var(--accent)}button{color:var(--text);background:var(--soft);border:1px
 .power-sources summary{cursor:pointer}
 
 @media(max-width:760px){.energy-insights{max-height:39%}}
+.power-bulb.unknown{background:var(--soft);color:var(--muted);border:1px solid var(--border)}
+.power-bulb.partial{background:#f5d6a9;color:#643b05}
+.power-bulb.unknown .bulb-rays,.power-bulb.partial .bulb-slash{display:none}
+.power-count{margin:.45rem 0 0}
