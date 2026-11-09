@@ -5,6 +5,7 @@ const baseURL=`http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir:'./tests',
+  workers:1,
   timeout:100_000,
   expect:{timeout:20_000},
   use:{
