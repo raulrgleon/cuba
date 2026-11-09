@@ -1,14 +1,16 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import type {Map as MapLibre, StyleSpecification} from 'maplibre-gl';
+import {bulbSvg,powerMarkerTitle,type PowerMarker} from './power-live';
 import {energyLegend} from './observatories';
-import {areaColor,areaPalette,bounds,populationColor,placeKinds,displayName,extent,type Airport,type Place,type PlaceKind,type PlaceCollection,type ProvincialPopulation,type Boundaries,type Boundary,type Level} from './data';
+import {areaColor,areaPalette,bounds,populationColor,placeKinds,displayName,extent,normalize,type Airport,type Place,type PlaceKind,type PlaceCollection,type ProvincialPopulation,type Boundaries,type Boundary,type Level} from './data';
 
 type Props = {
   mapStyle:'positron'|'liberty'|'regional';
   provinces:Boundaries; municipalities:Boundaries; levels:Record<Level,boolean>;
   selected:Boundary|null; onSelect:(feature:Boundary)=>void; reset:number;
   language:'es'|'en'; light:boolean; areas:boolean;
+  powerMarkers:PowerMarker[];
   electricityColors:Record<string,string>|null; electricityDate:string;
   population:ProvincialPopulation|null; populationYear:number; populationVisible:boolean;
   place:Place|null; places:PlaceCollection|null; placeLayers:PlaceKind[]; onPlace:(place:Place)=>void;
@@ -170,15 +172,17 @@ export default function MapView(props:Props) {
     }
   },[ready,levels,light,areas,population,populationVisible,populationYear,provinces,electricityColors]);
 
+  const electricityMode=!!electricityColors;
   useEffect(()=>{
     const instance=map.current;
     if(!ready||!instance) return;
     instance.setFilter('selection-province',['==',['get','boundaryId'],selected?.properties.level==='ADM1'?selected.id:'']);
     instance.setFilter('selection-municipality',['==',['get','boundaryId'],selected?.properties.level==='ADM2'?selected.id:'']);
     const wide=window.innerWidth>760;
-    const padding=wide?{top:54,bottom:62,left:225,right:selected?310:76}:46;
+    const padding=wide?{top:54,bottom:62,left:225,right:selected?310:76}
+      :electricityMode?{top:45,bottom:Math.round(instance.getContainer().clientHeight*.42),left:34,right:34}:46;
     instance.fitBounds(selected?extent(selected):bounds,{padding,duration:window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:450,maxZoom:11});
-  },[ready,selected,reset]);
+  },[ready,selected,reset,electricityMode]);
 
   useEffect(()=>{
     const instance=map.current;
@@ -255,6 +259,49 @@ export default function MapView(props:Props) {
     });
     return ()=>{disposed=true;markers.forEach(marker=>marker.remove());};
   },[ready,militaryCounts,provinces,language]);
+
+  useEffect(()=>{
+    const instance=map.current;
+    if(!ready||!instance||!props.powerMarkers.length)return;
+    let disposed=false;
+    const markers:{remove:()=>unknown}[]=[];
+    let detach=()=>{};
+    import('maplibre-gl').then(({Marker})=>{
+      if(disposed)return;
+      const byProvince=new Map(provinces.features.map(feature=>[normalize(displayName(feature)),feature]));
+      function render(){
+        markers.splice(0).forEach(marker=>marker.remove());
+        const visible=new Map<string,PowerMarker>();
+        for(const item of props.powerMarkers){
+          const province=byProvince.get(normalize(item.province));
+          const feature=instance!.getZoom()<7&&province&&province.id!==selected?.id&&item.feature.id!==selected?.id
+            ?province:item.feature;
+          const group=visible.get(feature.id)??{...item,feature,on:0,off:0};
+          group.on+=item.on;group.off+=item.off;
+          visible.set(feature.id,group);
+        }
+        for(const item of visible.values()){
+          const [[west,south],[east,north]]=extent(item.feature);
+          for(const state of ['on','off'] as const){
+            if(!item[state])continue;
+            const element=document.createElement('button');
+            element.type='button';
+            element.className='power-bulb map-power-bulb '+state;
+            element.innerHTML=bulbSvg;
+            element.title=powerMarkerTitle(language,state,item[state],item.feature);
+            element.setAttribute('aria-label',element.title);
+            element.onclick=event=>{event.stopPropagation();latest.current.onSelect(item.feature);};
+            const offset:[number,number]=[item.on&&item.off?(state==='on'?-15:15):0,0];
+            markers.push(new Marker({element,offset}).setLngLat([(west+east)/2,(south+north)/2]).addTo(instance!));
+          }
+        }
+      }
+      render();
+      instance.on('zoomend',render);
+      detach=()=>{instance.off('zoomend',render);};
+    });
+    return ()=>{disposed=true;detach();markers.forEach(marker=>marker.remove());};
+  },[ready,props.powerMarkers,language,provinces,selected]);
 
   useEffect(()=>{
     if(!ready||!airport?.coordinates||!map.current) return;

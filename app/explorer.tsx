@@ -2,6 +2,7 @@
 
 import {useEffect,useMemo,useState} from 'react';
 import MapView from './map';
+import {LivePower,powerMarkers,type PowerSnapshot} from './power-live';
 import {Electricity,HumanRights,energyColor,type EnergyData} from './observatories';
 import {AirportDirectory,WhoIsWho,airportCategories} from './directories';
 import {areaKm2,displayName,searchFeatures,normalize,themes,placeKinds,type Place,type PlaceKind,type PlaceCollection,type ProvincialPopulation,type Airport,type Airports,type Theme,type Boundaries,type Boundary,type Indicator,type Level,type Sources} from './data';
@@ -58,6 +59,9 @@ export default function Explorer() {
   const [airportProvince,setAirportProvince]=useState('');
   const [rightsOpen,setRightsOpen]=useState(false);
   const [energy,setEnergy]=useState<EnergyData|null>(null);
+  const [power,setPower]=useState<PowerSnapshot|null>(null);
+  const [powerFailed,setPowerFailed]=useState(false);
+  const [powerNow,setPowerNow]=useState(0);
   const [energyDate,setEnergyDate]=useState('');
   const [energyError,setEnergyError]=useState(false);
   const [energyRetry,setEnergyRetry]=useState(0);
@@ -136,6 +140,29 @@ export default function Explorer() {
     return ()=>{controller.abort();clearInterval(timer);};
   },[energyOpen,energyRetry]);
 
+  useEffect(()=>{
+    if(!energyOpen)return;
+    const controller=new AbortController();
+    async function refresh(){
+      const now=Date.now();
+      setPowerNow(now);
+      try {
+        const response=await fetch('/data/power-live.json?minute='+Math.floor(now/60_000),{signal:controller.signal,cache:'no-store'});
+        if(!response.ok)throw new Error();
+        const snapshot:PowerSnapshot=await response.json();
+        if(!Array.isArray(snapshot.reports))throw new Error();
+        if(!controller.signal.aborted){setPower(snapshot);setPowerFailed(false);}
+      } catch {
+        if(!controller.signal.aborted)setPowerFailed(true);
+      }
+    }
+    void refresh();
+    const timer=setInterval(refresh,60_000);
+    return ()=>{controller.abort();clearInterval(timer);};
+  },[energyOpen]);
+
+  const recentPower=useMemo(()=>power?.reports.filter(row=>powerNow-Date.parse(row.at)<=power.windowHours*3_600_000)??[],[power,powerNow]);
+  const bulbs=useMemo(()=>energyOpen&&data?powerMarkers(data.municipalities.features,recentPower):[],[energyOpen,data,recentPower]);
   const features=useMemo(()=>data?[...data.provinces.features,...data.municipalities.features]:[],[data]);
   const results=useMemo(()=>searchFeatures(features,query),[features,query]);
   const themed=data?.indicators.filter(item=>item.category===theme)??[];
@@ -204,6 +231,14 @@ export default function Explorer() {
   }
 
   function resetMap() {setEnergyOpen(false);setSelected(null);setAirport(null);setPlace(null);setShowInsights(false);setReset(current=>current+1);}
+
+  function openPower(open=true) {
+    setEnergyOpen(open);setRightsOpen(false);setDirectory(null);setShowInsights(open);
+    if(open){
+      setToolsOpen(false);setAirport(null);setPlace(null);setEnergyDate('');
+      setLevels(current=>({...current,ADM1:true}));
+    }
+  }
 
   function chooseTheme(next:Theme) {
     const nextIndicator=data?.indicators.find(item=>item.category===next);
@@ -301,11 +336,7 @@ export default function Explorer() {
       </nav>
     </header>
     <nav className="observatory-nav" aria-label={language==='es'?'Observatorios':'Observatories'}>
-      <button className={energyOpen?'active':''} aria-pressed={energyOpen} onClick={()=>{
-        const open=!energyOpen||!showInsights;
-        setEnergyOpen(open);setRightsOpen(false);setDirectory(null);setShowInsights(open);
-        if(!energyOpen)setLevels(current=>({...current,ADM1:true}));
-      }}>ϟ {language==='es'?'Observatorio eléctrico':'Electricity observatory'}</button>
+      <button className={energyOpen?'active':''} aria-pressed={energyOpen} onClick={()=>openPower(!energyOpen||!showInsights)}>ϟ {language==='es'?'Observatorio eléctrico':'Electricity observatory'}</button>
       <button className={rightsOpen?'active':''} aria-pressed={rightsOpen} onClick={()=>{setDirectory(null);setRightsOpen(!rightsOpen);}}>◎ {language==='es'?'Derechos humanos':'Human rights'}</button>
       <button aria-pressed={directory==='airports'} onClick={()=>directory==='airports'?setDirectory(null):openDirectory('airports')}>✈ {language==='es'?'Aeropuertos':'Airports'}</button>
       <button aria-pressed={directory==='offices'} onClick={()=>directory==='offices'?setDirectory(null):openDirectory('offices')}>◇ {language==='es'?'Quién es quién':'Who is who'}</button>
@@ -328,8 +359,8 @@ export default function Explorer() {
         <button onClick={()=>{setToolsOpen(!toolsOpen);}} aria-expanded={toolsOpen}>▱ {t.layers}</button>
         <button onClick={()=>setComparisonOpen(!comparisonOpen)} aria-expanded={comparisonOpen}>⇄ {language==='es'?'Comparar':'Compare'}</button>
         <p>{language==='es'?'DATOS':'DATA'}</p>
-        {(Object.keys(themes) as Theme[]).map(key=><button key={key} className={key===theme?'theme-active':''}
-          aria-pressed={theme===key} onClick={()=>chooseTheme(key)}><span aria-hidden="true">{themes[key].icon}</span> {themes[key][language]}</button>)}
+        {(Object.keys(themes) as Theme[]).map(key=><button key={key} className={(energyOpen?key==='energy':key===theme)?'theme-active':''}
+          aria-pressed={energyOpen?key==='energy':theme===key} onClick={()=>key==='energy'?openPower():chooseTheme(key)}><span aria-hidden="true">{themes[key].icon}</span> {themes[key][language]}</button>)}
         <button onClick={()=>setPanel('sources')}>◎ {t.sources}</button>
       </nav>
       <button className="mobile-tools" onClick={()=>setToolsOpen(!toolsOpen)} aria-expanded={toolsOpen}>{t.menu}</button>
@@ -374,15 +405,19 @@ export default function Explorer() {
         <button className="secondary" onClick={resetMap}>⟲ {t.reset}</button>
         <div className="source-note"><span className="eyebrow">{t.boundary}</span><p>{t.note}</p></div>
       </aside>
-      {data?<MapView key={mapStyle} mapStyle={mapStyle} provinces={data.provinces} municipalities={data.municipalities} levels={levels} selected={selected} reset={reset} onSelect={pick} language={language} light={light} areas={areas} airports={airportLayer?data.airports?.airports:undefined} airport={airport} onAirport={chooseAirport} population={population} populationYear={populationYear} populationVisible={populationVisible&&!!population} place={place} places={places} placeLayers={placeLayers} onPlace={choosePlace} electricityColors={electricityColors} electricityDate={electricityDate} militaryCounts={militaryLayer?militaryCounts:null} onMilitary={province=>openDirectory('airports',province)}/>
+      {data?<MapView key={mapStyle} mapStyle={mapStyle} provinces={data.provinces} municipalities={data.municipalities} levels={levels} selected={selected} reset={reset} onSelect={pick} language={language} light={light} areas={areas} airports={airportLayer&&!energyOpen?data.airports?.airports:undefined} airport={airport} onAirport={chooseAirport} population={population} populationYear={populationYear} populationVisible={populationVisible&&!!population} place={place} places={places} placeLayers={energyOpen?[]:placeLayers} onPlace={choosePlace} electricityColors={electricityColors} electricityDate={electricityDate} powerMarkers={bulbs} militaryCounts={militaryLayer&&!energyOpen?militaryCounts:null} onMilitary={province=>openDirectory('airports',province)}/>
         :<section className="map-zone map-placeholder">{loadError?<div><p>{t.fail}</p><button onClick={()=>{setLoadError(false);setAttempt(attempt+1);}}>{t.retry}</button></div>:t.load}</section>}
       {energyOpen&&showInsights&&<aside className="insights energy-insights" aria-label={language==='es'?'Observatorio eléctrico':'Electricity observatory'}>
         <button className="insights-close" onClick={()=>setShowInsights(false)} aria-label={t.close}>×</button>
         <p className="eyebrow"><i/>{language==='es'?'PARTES ELÉCTRICOS':'POWER REPORTS'}</p>
         <h2>{language==='es'?'Dónde se reportan cortes':'Where outages are reported'}</h2>
+        <LivePower snapshot={power} reports={recentPower} territory={selected} language={language}
+          failed={powerFailed||(!!power&&powerNow-Date.parse(power.checked)>15*60_000)}
+          onClear={()=>{setSelected(null);setReset(current=>current+1);}}/>
         <Electricity data={energy} date={electricityDate} onDate={setEnergyDate} province={selectedProvince?provinceKey(selectedProvince):''}
           provinces={energyProvinces} onProvince={key=>{const match=energyProvinces.find(item=>item.key===key);if(match)pick(match.feature);else setSelected(null);}}
           language={language} failed={energyError} onRetry={()=>setEnergyRetry(current=>current+1)}/>
+        <button type="button" className="secondary" onClick={()=>chooseTheme('energy')}>{language==='es'?'Indicadores históricos de energía':'Historical energy indicators'}</button>
       </aside>}
       <aside className={showInsights&&!energyOpen?'insights':'insights insights-closed'}>
         <button className="insights-close" onClick={()=>setShowInsights(false)} aria-label={t.close}>×</button>

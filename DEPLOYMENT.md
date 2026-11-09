@@ -11,3 +11,9 @@ El servicio aislado usa `python3 scripts/serve.py --directory out` en loopback. 
 ## Actualización eléctrica
 
 En DNET, copia `scripts/ingest_energy.py` al directorio de despliegue y las unidades `deploy/systemd/cubaos-energy.*` al directorio de unidades del usuario. Ejecuta `systemctl --user daemon-reload`, `systemctl --user start cubaos-energy.service` y `systemctl --user enable --now cubaos-energy.timer`. El importador solo publica al terminar correctamente y conserva el archivo anterior ante un error.
+
+## Avisos por circuito
+
+`scripts/ingest_power_live.py --output out/data/power-live.json` publica los avisos recientes con lugar, hora y enlace. En DNET instala el script y las unidades `deploy/systemd/cubaos-power.*` del usuario. Ejecuta `systemctl --user daemon-reload`, `systemctl --user start cubaos-power.service` y `systemctl --user enable --now cubaos-power.timer`. El temporizador consulta las fuentes cada tres minutos. Conserva `out/data/power-live.json` y `out/data/energy.json` al cambiar de versión.
+
+El mapa agrupa los avisos de las últimas seis horas por provincia o municipio según el zoom. Un aviso de circuito identifica su último estado publicado. Las estadísticas provinciales, los horarios, los avisos sin municipio identificable y las discrepancias sin resolver quedan fuera de esa capa.

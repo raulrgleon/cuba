@@ -1,0 +1,9 @@
+[Unit]
+Description=Refresh geolocated CubaOS circuit notices
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/.local/share/cubaos
+ExecStart=/usr/bin/python3 scripts/ingest_power_live.py --output out/data/power-live.json
+NoNewPrivileges=yes
+TimeoutStartSec=45s

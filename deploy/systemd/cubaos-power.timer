@@ -1,0 +1,11 @@
+[Unit]
+Description=Fetch CubaOS circuit notices every three minutes
+
+[Timer]
+OnCalendar=*-*-* *:0/3:00
+AccuracySec=10s
+Persistent=true
+Unit=cubaos-power.service
+
+[Install]
+WantedBy=timers.target

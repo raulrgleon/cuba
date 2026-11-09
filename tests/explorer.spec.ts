@@ -39,7 +39,7 @@ test('explores the map and national series',async({page})=>{
   await expect(page.getByRole('heading',{name:'Catálogo de fuentes'})).toBeVisible();
   await page.locator('.drawer').getByRole('button',{name:'Cerrar'}).click();
   await page.getByRole('button',{name:'Energía',exact:true}).click();
-  await expect(page.locator('#indicator')).toHaveValue('EG.ELC.ACCS.ZS');
+  await expect(page.getByRole('heading',{name:'Avisos por circuito'})).toBeVisible();
   await page.getByRole('button',{name:'Transporte',exact:true}).click();
   await expect(page.locator('.airport-marker')).not.toHaveCount(0);
   await page.getByRole('button',{name:/^HAV ·/}).first().click();
