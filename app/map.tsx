@@ -65,11 +65,14 @@ export default function MapView(props:Props) {
         {id:'province-edge',type:'line',source:'ADM1',paint:{'line-color':'#e2eff8','line-width':1.1}},
         {id:'municipality-fill',type:'fill',source:'ADM2',paint:{'fill-color':'#397ab1','fill-opacity':.18}},
         {id:'municipality-edge',type:'line',source:'ADM2',paint:{'line-color':'#315f8a','line-opacity':.62,'line-width':.8}},
-        {id:'selection-province',type:'line',source:'ADM1',filter:['==',['id'],''],paint:{'line-color':'#254b72','line-width':3}},
-        {id:'selection-municipality',type:'line',source:'ADM2',filter:['==',['id'],''],paint:{'line-color':'#254b72','line-width':3}},
+        {id:'selection-province',type:'line',source:'ADM1',filter:['==',['get','boundaryId'],''],paint:{'line-color':'#254b72','line-width':3}},
+        {id:'selection-municipality',type:'line',source:'ADM2',filter:['==',['get','boundaryId'],''],paint:{'line-color':'#254b72','line-width':3}},
       ];
       const provinceData={...initial.provinces,features:initial.provinces.features.map(feature=>({
-        ...feature,properties:{...feature.properties,areaColor:areaColor(feature)},
+        ...feature,properties:{...feature.properties,boundaryId:feature.id,areaColor:areaColor(feature)},
+      }))};
+      const municipalityData={...initial.municipalities,features:initial.municipalities.features.map(feature=>({
+        ...feature,properties:{...feature.properties,boundaryId:feature.id},
       }))};
       const baselayers:StyleSpecification['layers']=background?.layers??[
         {id:'sea',type:'background',paint:{'background-color':'#d7e2e5'}},
@@ -84,7 +87,7 @@ export default function MapView(props:Props) {
         style:{...background,version:8,sources:{...background?.sources,
           ...(!background?{caribbean:{type:'geojson' as const,data:'/data/caribbean.geojson'}}:{}),
           ADM1:{type:'geojson',data:provinceData},
-          ADM2:{type:'geojson',data:initial.municipalities},
+          ADM2:{type:'geojson',data:municipalityData},
         },layers:[...baselayers.slice(0,split),...palette,...baselayers.slice(split)]},
         bounds,fitBoundsOptions:{padding:76},maxZoom:13,minZoom:3,
         attributionControl:false,dragRotate:false,touchPitch:false,
@@ -113,7 +116,7 @@ export default function MapView(props:Props) {
           const placeHit=instance.getLayer('place-points')
             ? instance.queryRenderedFeatures(event.point,{layers:['place-points','place-lines']})[0] : undefined;
           if(placeHit){
-            const place=active.places?.features.find(item=>item.id===placeHit.id);
+            const place=active.places?.features.find(item=>item.id===placeHit.properties.placeId);
             if(place){active.onPlace(place);return;}
           }
           const query=[...(active.levels.ADM2?['municipality-fill']:[]),...(active.levels.ADM1?['province-fill']:[])];
@@ -121,7 +124,7 @@ export default function MapView(props:Props) {
           const hit=instance.queryRenderedFeatures(event.point,{layers:query})[0];
           if(!hit) return;
           const collection=hit.source==='ADM2'?active.municipalities:active.provinces;
-          const feature=collection.features.find(item=>item.id===hit.id);
+          const feature=collection.features.find(item=>item.id===hit.properties.boundaryId);
           if(feature) active.onSelect(feature);
         });
         instance.on('mousemove',event=>{
@@ -149,11 +152,11 @@ export default function MapView(props:Props) {
     }
     if(populationVisible&&population){
       const yearIndex=population.years.indexOf(populationYear);
-      const expression=['match',['id'],
+      const expression:import('maplibre-gl').ExpressionSpecification=['match',['get','boundaryId'],'','#a6adb2',
         ...provinces.features.flatMap(feature=>{
           const value=population.territories[displayName(feature)]?.[yearIndex];
           return [feature.id,typeof value==='number'?populationColor(value):'#a6adb2'];
-        }),'#a6adb2'] as import('maplibre-gl').ExpressionSpecification;
+        }),'#a6adb2'];
       instance.setPaintProperty('province-fill','fill-color',expression);
     } else {
       instance.setPaintProperty('province-fill','fill-color',areas?['get','areaColor']:'#86add1');
@@ -163,8 +166,8 @@ export default function MapView(props:Props) {
   useEffect(()=>{
     const instance=map.current;
     if(!ready||!instance) return;
-    instance.setFilter('selection-province',['==',['id'],selected?.properties.level==='ADM1'?selected.id:'']);
-    instance.setFilter('selection-municipality',['==',['id'],selected?.properties.level==='ADM2'?selected.id:'']);
+    instance.setFilter('selection-province',['==',['get','boundaryId'],selected?.properties.level==='ADM1'?selected.id:'']);
+    instance.setFilter('selection-municipality',['==',['get','boundaryId'],selected?.properties.level==='ADM2'?selected.id:'']);
     const wide=window.innerWidth>760;
     const padding=wide?{top:54,bottom:62,left:225,right:selected?310:76}:46;
     instance.fitBounds(selected?extent(selected):bounds,{padding,duration:window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:450,maxZoom:11});
@@ -174,7 +177,11 @@ export default function MapView(props:Props) {
     const instance=map.current;
     if(!ready||!instance||!places) return;
     if(!instance.getSource('public-places')){
-      instance.addSource('public-places',{type:'geojson',data:places});
+      instance.addSource('public-places',{type:'geojson',data:{
+        type:'FeatureCollection',features:places.features.map(feature=>({
+          ...feature,properties:{...feature.properties,placeId:feature.id},
+        })),
+      }});
       const colors:import('maplibre-gl').ExpressionSpecification=['match',['get','kind'],
         'road',placeKinds.road.color,
         ...Object.entries(placeKinds).filter(([key])=>key!=='road').flatMap(([key,item])=>[key,item.color]),'#397b6b'];
